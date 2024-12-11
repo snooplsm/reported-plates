@@ -1,0 +1,54 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Local environment settings
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE/Editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MacOS files
+.DS_Store
+
+# Miscellaneous
+*.log
+*.lock
+*.cache
+
+# Package lock files (optional: if you're using only one package manager)
+# Uncomment based on your choice
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Temporary files
+tmp/
+temp/
+
+# Test coverage
+coverage/
+
+# Storybook
+storybook-static/
+
+# Build tools
+*.gz
+*.br
+
+# Git-specific files
+!.gitignore
