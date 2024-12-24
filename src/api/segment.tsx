@@ -7,8 +7,7 @@ const models = [
     ['segment', 'yolov8n-seg'],
     ['nms', 'nms-yolov8'],
     ['mask', 'mask-yolov8-seg'],
-    ['plate', 'yolo-v9-t-640-license-plates-end2end'],
-    ['ocr', 'global_mobile_vit_v2_ocr']
+    ['plate', 'yolo-v9-t-640-license-plates-end2end']
 ]
 
 env.wasm.wasmPaths = '/'
@@ -20,7 +19,6 @@ let downloading: Promise<void> | null = null;
 let yolo: InferenceSession
 let nms: InferenceSession
 let plate: InferenceSession
-let ocr:InferenceSession
 
 const topk = 100;
 const iouThreshold = 0.4;
@@ -50,7 +48,6 @@ export const downloadAll = async () => {
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
         plate = await InferenceSession.create(result[3]);
-        ocr = await InferenceSession.create(result[4]);
         downloaded = true
         downloading = null
     }).catch(k => {
@@ -108,8 +105,8 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
         console.log("Image loaded!", src);
         const matC3 = new cv.Mat(src.rows, src.cols, cv.CV_8UC3); // new image matrix
         cv.cvtColor(src, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
-        // const [w, h] = divStride(32, matC3.cols, matC3.rows);
-        // cv.resize(matC3, matC3, new cv.Size(w, h))
+        const [w, h] = divStride(32, matC3.cols, matC3.rows);
+        cv.resize(matC3, matC3, new cv.Size(w, h))
         const maxSize = Math.max(matC3.rows, matC3.cols)
         const xPad = maxSize - matC3.cols;
         const xRatio = maxSize / matC3.cols;
@@ -221,27 +218,16 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
             ctx.putImageData(imgData, 0, 0);
             const blob = await canvasToBlob(canvas)
             box.car = blob
-
-            const url = URL.createObjectURL(blob);
-
-            // Create a hidden <a> element to trigger the download
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = "car.jpg";
-
-            // Trigger the download
-            link.click();
-
-            // Clean up the temporary URL
-            URL.revokeObjectURL(url);
         
             const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
             cv.cvtColor(roi, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
+            const [w1, h1] = divStride(32, matC3.cols, matC3.rows);
+            cv.resize(matC3, matC3, new cv.Size(w1, h1))
             const maxSize = Math.max(matC3.rows, matC3.cols)
-            const xPad1 = maxSize - matC3.cols;
-            const xRatio1 = maxSize / matC3.cols;
-            const yPad1 = maxSize - matC3.rows;
-            const yRatio1 = maxSize / matC3.rows;
+            const xPad = maxSize - matC3.cols;
+            const xRatio = maxSize / matC3.cols;
+            const yPad = maxSize - matC3.rows;
+            const yRatio = maxSize / matC3.rows;
             const width_scale = roi.cols / modelWidth
             const height_scale = roi.rows / modelHeight
             const matPad = new cv.Mat();
@@ -266,24 +252,42 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                 const h1 = predictions.data[i + 4] as number
                 const confidence = predictions.data[i + 6] as number
                 const classId = predictions.data[i + 5] as number
-                let box1 = [
-                    (x1 - xPad1) * width_scale, 
-                    (y1 - yPad1) / yRatio1, 
-                    (w1 - xPad1) / xRatio1, 
-                    (h1 - yPad1) / xRatio1]
-                
-                if (confidence > .2) {
+                let box1 = [x1, y1, w1, h1]
+                // box1 = overflowBoxes(
+                //     [
+                //         box1[0] - 0.5 * box1[2], // before upscale x
+                //         box1[1] - 0.5 * box1[1], // before upscale y
+                //         box1[2], // before upscale w
+                //         box1[3], // before upscale h
+                //     ],
+                //     maxSize
+                // ); // keep boxes in maxSize range
 
-                    const [x, y, w, h] = box1
+                const [x2, y2, w2, h2] = overflowBoxes(
+                    [
+                        Math.floor(box1[0] * xRatio), // upscale left
+                        Math.floor(box1[1] * yRatio), // upscale top
+                        Math.floor(box1[2] * xRatio), // upscale width
+                        Math.floor(box1[3] * yRatio), // upscale height
+                    ],
+                    maxSize
+                ); // upscale boxes
+                if (confidence > .2) {
+                    const box2: [x: number, y: number, w: number, h: number] = [x2 * width_scale,
+                    y2 * height_scale,
+                    w2 * width_scale,
+                    h2 * height_scale]
+
+                    const [x, y, w, h] = box2
 
                     box.plate = {
-                        box: box1,
+                        box: box2,
                         probability: confidence,
                         image: null
                     }
 
-                    console.log("plate within", box1)
-                    const rect = new cv.Rect(x, y, w, h)
+                    console.log("plate within", box2)
+                    const rect = new cv.Rect(x, y, w-x, h-y)
                     const thecar = box.car
                     let roi = await blobToMat(box.car as Blob)
                     roi = roi.roi(rect).clone()
@@ -312,72 +316,6 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     // Clean up the temporary URL
                     URL.revokeObjectURL(url);
                     console.log(box.plate)
-                    const src = await blobToMat(blob)
-                    const matC3 = new cv.Mat(src.rows, src.cols, cv.CV_8UC1); // new image matrix
-                    cv.cvtColor(src, matC3, cv.COLOR_BGR2GRAY); // RGBA to BGR
-                    const [w3, h3] = divStride(32, matC3.cols, matC3.rows);
-                    cv.resize(matC3, matC3, new cv.Size(w3, h3))
-                    const maxSize = Math.max(matC3.rows, matC3.cols)
-                    const xPad = maxSize - matC3.cols;
-                    const xRatio = maxSize / matC3.cols;
-                    const yPad = maxSize - matC3.rows;
-                    const yRatio = maxSize / matC3.rows;
-                    const width_scale1 = src.cols / 140
-                    const height_scale1 = src.rows / 70
-                    const matPad = new cv.Mat();
-                    cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
-                    cv.resize(matPad, matPad, new cv.Size(140,70))
-
-                    const input = new Uint8Array(matPad.data); 
-                    // src.delete();
-                    matC3.delete();
-                    matPad.delete();
-                    const slots = 10
-                    const tensorShape = [slots, 70, 140, 1];
-                    const tensorData = new Uint8Array(slots * 70 * 140 * 1);
-
-                    // Fill the tensorData with the image data (supports batch if needed)
-                    for (let i = 0; i < input.length; i++) {
-                        tensorData[i] = input[i];
-                    }
-                    const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWYZ_"
-                    // Create the tensor
-                    const tensor = new Tensor("uint8", tensorData, tensorShape);
-                    const {concatenate} = await ocr.run({input: tensor})
-                    const totalElements = concatenate.data.length;
-                    const alphabetLength = alphabet.length;
-                    const batchSize = slots * alphabetLength;
-                    const reshaped = concatenate
-                    const predictionIndices = [];
-                    const data = reshaped.data; // Access the raw data as a Float32Array
-                    for (let b = 0; b < batchSize; b++) {
-                        const batchStart = b * slots * alphabetLength;
-                        const batchIndices = [];
-                        for (let s = 0; s < slots; s++) {
-                            const slotStart = batchStart + s * alphabetLength;
-                            const slotData = data.slice(slotStart, slotStart + alphabetLength);
-
-                            // Find the index of the maximum value in this slot
-                            const maxIndex = slotData.reduce((maxIdx, value, idx, array) =>
-                                value > array[maxIdx] ? idx : maxIdx, 0);
-                            batchIndices.push(maxIndex);
-                        }
-                        predictionIndices.push(batchIndices);
-                    }
-
-                    // Step 3: Convert the model alphabet into an array
-                    const alphabetArray = Array.from(alphabet);
-
-                    // Step 4: Map indices to characters
-                    const predictions = predictionIndices.map(batch =>
-                        batch.map(index => alphabetArray[index])
-                    );
-
-                    console.log(predictionIndices)
-
-                    console.log(predictions)
-                
-                    // console.log(concatenate)
                 }
             }
 
