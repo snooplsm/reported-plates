@@ -1,14 +1,12 @@
-# Node modules
+# Node.js dependencies
 node_modules/
 
-# Build output
+# Build directories
 dist/
 build/
 
-# Local environment settings
-.env
-.env.local
-.env.*.local
+# TypeScript
+*.tsbuildinfo
 
 # Logs
 npm-debug.log*
@@ -16,39 +14,54 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# IDE/Editor settings
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# MacOS files
+# OS-specific files
 .DS_Store
+Thumbs.db
 
-# Miscellaneous
-*.log
-*.lock
-*.cache
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Package lock files (optional: if you're using only one package manager)
-# Uncomment based on your choice
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# IDEs and Editors
+# JetBrains IDEs (WebStorm, IntelliJ, etc.)
+.idea/
+# VSCode settings
+.vscode/
+*.code-workspace
+# Vim swap files
+*.swp
+# Mac-specific file attributes
+.AppleDouble
+.LSOverride
+
+# Cache and output files
+# Parcel-bundler cache
+.cache/
+# Next.js build cache
+.next/
+# Webpack cache
+.webpack/
+# TypeScript cache
+.tsbuildinfo
+# Coverage reports
+coverage/
+# Cypress test outputs
+cypress/screenshots/
+cypress/videos/
+
+# Dependency directory
+jspm_packages/
 
 # Temporary files
 tmp/
 temp/
 
-# Test coverage
-coverage/
+# Compiled files
+*.log
+*.out
+*.class
 
-# Storybook
-storybook-static/
-
-# Build tools
-*.gz
-*.br
-
-# Git-specific files
-!.gitignore
+# Other
+!README.md
+/reported/
