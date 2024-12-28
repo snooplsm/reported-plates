@@ -7,7 +7,8 @@ const models = [
     ['segment', 'yolov8n-seg'],
     ['nms', 'nms-yolov8'],
     ['mask', 'mask-yolov8-seg'],
-    ['plate', 'yolo-v9-t-640-license-plates-end2end']
+    ['plate', 'yolo-v9-t-640-license-plates-end2end'],
+    ['ocr', 'global_mobile_vit_v2_ocr']
 ]
 
 env.wasm.wasmPaths = '/'
@@ -19,6 +20,7 @@ let downloading: Promise<void> | null = null;
 let yolo: InferenceSession
 let nms: InferenceSession
 let plate: InferenceSession
+let ocr: InferenceSession
 
 const topk = 100;
 const iouThreshold = 0.4;
@@ -48,6 +50,7 @@ export const downloadAll = async () => {
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
         plate = await InferenceSession.create(result[3]);
+        ocr = await InferenceSession.create(result[4]);
         downloaded = true
         downloading = null
     }).catch(k => {
@@ -202,8 +205,10 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
             }); // update boxes to draw later
         }
 
-        boxes.map(async box => {
+        for(const box of boxes) {
             const [x, y, w, h] = box.scaled
+            console.log("boudning", box.bounding)
+            console.log("scaled", box.scaled)
             const rect = new cv.Rect(x, y, w, h)
             const roi = src.roi(rect).clone()
             let canvas = document.createElement('canvas') as HTMLCanvasElement;
@@ -217,6 +222,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
             canvas.height = imgData.height;
             ctx.putImageData(imgData, 0, 0);
             const blob = await canvasToBlob(canvas)
+            canvas.remove()
             box.car = blob
         
             const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
@@ -239,7 +245,8 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                 true,
                 false
             )
-
+            matC3.delete()
+            matPad.delete()
             const tensor = new Tensor("float32", input.data32F, modelInputShape);
             const { output0: predictions } = await plate.run({
                 images: tensor
@@ -273,11 +280,15 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     maxSize
                 ); // upscale boxes
                 if (confidence > .2) {
-                    const box2: [x: number, y: number, w: number, h: number] = [x2 * width_scale,
+                    let box2: [x: number, y: number, w: number, h: number] = [x2 * width_scale,
                     y2 * height_scale,
                     w2 * width_scale,
                     h2 * height_scale]
-
+                    console.log(box2)
+                    // box2 = [
+                    //     240, 259, 380, 345
+                    // ]
+                    console.log(box2)
                     const [x, y, w, h] = box2
 
                     box.plate = {
@@ -287,10 +298,14 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     }
 
                     console.log("plate within", box2)
-                    const rect = new cv.Rect(x, y, w-x, h-y)
+                    const [cropX,cropY,cropWidth,cropHeight] = [
+                        x,y,w-x,h-y
+                    ]
+                    const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
                     const thecar = box.car
-                    let roi = await blobToMat(box.car as Blob)
-                    roi = roi.roi(rect).clone()
+                    let roid = await blobToMat(box.car as Blob)
+                    let roi = roid.roi(rect).clone()
+                    roid.delete()
                     let canvas = document.createElement('canvas') as HTMLCanvasElement;
                     let ctx = canvas.getContext('2d') as CanvasRenderingContext2D
                     let imgData = new ImageData(
@@ -302,6 +317,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     canvas.height = imgData.height;
                     ctx.putImageData(imgData, 0, 0);
                     const blob = await canvasToBlob(canvas)
+                    canvas.remove()
                     box.plate.image = blob                
                     const url = URL.createObjectURL(blob);
 
@@ -316,12 +332,87 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     // Clean up the temporary URL
                     URL.revokeObjectURL(url);
                     console.log(box.plate)
+
+                    const src = await blobToMat(blob)
+                    const matC3 = new cv.Mat(src.rows, src.cols, cv.CV_8UC1); // new image matrix
+                    cv.cvtColor(src, matC3, cv.COLOR_BGR2GRAY); // RGBA to BGR
+                    const [w3, h3] = divStride(32, matC3.cols, matC3.rows);
+                    cv.resize(matC3, matC3, new cv.Size(w3, h3))
+                    const maxSize = Math.max(matC3.rows, matC3.cols)
+                    const xPad = maxSize - matC3.cols;
+                    const xRatio = maxSize / matC3.cols;
+                    const yPad = maxSize - matC3.rows;
+                    const yRatio = maxSize / matC3.rows;
+                    const width_scale1 = src.cols / 140
+                    const height_scale1 = src.rows / 70
+                    const matPad = new cv.Mat();
+                    cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
+                    cv.resize(matPad, matPad, new cv.Size(140,70))
+
+                    const input = new Uint8Array(matPad.data); 
+                    // src.delete();
+                    roi.delete()
+                    matC3.delete();
+                    matPad.delete();
+                    const slots = 6
+                    const tensorShape = [slots, 70, 140, 1];
+                    const tensorData = new Uint8Array(slots * 70 * 140 * 1);
+
+                    // Fill the tensorData with the image data (supports batch if needed)
+                    for (let i = 0; i < input.length; i++) {
+                        tensorData[i] = input[i];
+                    }
+                    const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+                    // Create the tensor
+                    const tensor = new Tensor("uint8", tensorData, tensorShape);
+                    const {concatenate} = await ocr.run({input: tensor})
+                    console.log("concat", concatenate.data)
+                    const totalElements = concatenate.data.length;
+                    const alphabetLength = alphabet.length;
+                    const batchSize = slots * alphabetLength;
+                    const reshaped = concatenate
+                    const predictionIndices:number[][] = [];
+                    const data = reshaped.data; // Access the raw data as a Float32Array
+                    for (let b = 0; b < batchSize; b++) {
+                        const batchStart = b * slots * alphabetLength;
+                        const batchIndices:number[] = [];
+                        for (let s = 0; s < slots; s++) {
+                            const slotStart = batchStart + s * alphabetLength;
+                            const slotData = data.slice(slotStart, slotStart + alphabetLength);
+
+                            // Find the index of the maximum value in this slot
+                            const maxIndex = slotData.reduce((maxIdx, value, idx, array) =>
+                                value > array[maxIdx] ? idx : maxIdx, 0);
+                            batchIndices.push(maxIndex);
+                        }
+                        predictionIndices.push(batchIndices);
+                    }
+
+                    // Step 3: Convert the model alphabet into an array
+                    const alphabetArray = Array.from(alphabet);
+
+                    // Step 4: Map indices to characters
+                    const predictions = predictionIndices.map(batch =>
+                        batch.map(index => alphabetArray[index])
+                    );
+
+                    console.log("array" , alphabetArray)
+                    const plateChars = predictionIndices.map(batch =>
+                        batch.map(index => alphabetArray[index])
+                    );
+                    const plates = plateChars.map(row => row.join(""));
+                    const probs = predictions.map(row => Math.max(...row.map(parseFloat)));
+                    // console.log("prediction indexes", plateChars)
+
+                    // console.log("predictoins", predictions)
+
+                    console.log(plates)
+                    console.log(probs)
+                    // console.log(concatenate)
                 }
             }
 
-        })
-
-        console.log(boxes)
+        }
         src.delete()
     }
 
