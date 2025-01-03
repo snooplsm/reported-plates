@@ -6,7 +6,15 @@ interface ReversedYoloSegMap {
     [key:number]: string;
 }
 
-
+export const yoloClass:YoloSegMap = {
+    "CT":0,
+    "00":1,
+    "NJ":2,
+    "NY":3,
+    "NYPD":4,
+    "NY_TLC":5,
+    "PA":6
+}
 
 export const yoloSeg:YoloSegMap = {
     "person": 0,
@@ -99,8 +107,17 @@ export const yoloSegIndexToLabel: ReversedYoloSegMap = Object.entries(yoloSeg).r
     {} as ReversedYoloSegMap
 );
 
+export const yoloClassIndexToLabel: ReversedYoloSegMap = Object.entries(yoloClass).reduce(
+    (acc, [key, value]) => {
+        acc[value] = key;
+        return acc;
+    },
+    {} as ReversedYoloSegMap
+);
+
+
 export const yoloSegVehicles = new Set(["car", "truck", "bus"].map((x) => yoloSeg[x]))
 
-console.log(yoloSegVehicles)
-
 export const yoloSegClasses = Object.keys(yoloSeg).length
+
+export const yoloPlateClasses = Object.keys(yoloClass).length

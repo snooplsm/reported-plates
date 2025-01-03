@@ -4,7 +4,6 @@ export const download = (
 ): Promise<ArrayBuffer> => {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    console.log("get ", url)
     request.open("GET", url, true);
     request.responseType = "arraybuffer";
 

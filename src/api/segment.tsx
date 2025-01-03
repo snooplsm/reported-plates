@@ -8,6 +8,7 @@ const models = [
     ['nms', 'nms-yolov8'],
     ['mask', 'mask-yolov8-seg'],
     ['plate', 'yolo-v9-t-640-license-plates-end2end'],
+    ['plate-class', 'reported-plate-class-best'],
     ['ocr', 'global_mobile_vit_v2_ocr']
 ]
 
@@ -21,6 +22,7 @@ let yolo: InferenceSession
 let nms: InferenceSession
 let plate: InferenceSession
 let ocr: InferenceSession
+let plateClass: InferenceSession
 
 const topk = 100;
 const iouThreshold = 0.4;
@@ -35,7 +37,6 @@ export const downloadAll = async () => {
     }
     const promises: Promise<ArrayBuffer>[] = [];
     models.forEach(([type, modelName]) => {
-        console.log(import.meta.env.BASE_URL)
         console.log(`${import.meta.env.BASE_URL}models/${modelName}.onnx`)
         const url = `${import.meta.env.BASE_URL}models/${modelName}.onnx`
         promises.push(download(
@@ -50,7 +51,8 @@ export const downloadAll = async () => {
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
         plate = await InferenceSession.create(result[3]);
-        ocr = await InferenceSession.create(result[4]);
+        plateClass = await InferenceSession.create(result[4])
+        ocr = await InferenceSession.create(result[5]);
         downloaded = true
         downloading = null
     }).catch(k => {
@@ -147,12 +149,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
 
         const numClass = yoloSegClasses
 
-        const boxes: DetectBox[] = []; // ready to draw boxes
-        let overlay = new Tensor("uint8", new Uint8Array(modelHeight * modelWidth * 4), [
-            modelHeight,
-            modelWidth,
-            4,
-        ]); // create overlay to draw segmentation object
+        let boxes: DetectBox[] = []; // ready to draw boxes
 
         // looping through output
         for (let idx = 0; idx < selected.dims[1]; idx++) {
@@ -192,20 +189,41 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                 w * width_scale,
                 h * height_scale
             ]
-
-            boxes.push({
-                label: yoloSegIndexToLabel[label],
-                index: label,
-                probability: score,
-                data: data,
-                mask: data.slice(4 + numClass),
-                bounding: [x, y, w, h], // upscale box,
-                scaled: scaled,
-                box: box
-            }); // update boxes to draw later
+            if(score>=.7) {
+                boxes.push({
+                    label: yoloSegIndexToLabel[label],
+                    index: label,
+                    probability: score,
+                    data: data,
+                    mask: data.slice(4 + numClass),
+                    bounding: [x, y, w, h], // upscale box,
+                    scaled: scaled,
+                    box: box
+                }); // update boxes to draw later
+            }
         }
+        boxes = boxes.sort((a, b) => {
+            // Calculate the image center
+            const centerX = modelWidth / 2;
+            const centerY = modelHeight / 2;
+        
+            // Calculate the center of bounding box `a`
+            const centerAX = (a.bounding[0] + a.bounding[2]) / 2; // x_center
+            const centerAY = (a.bounding[1] + a.bounding[3]) / 2; // y_center
+        
+            // Calculate the center of bounding box `b`
+            const centerBX = (b.bounding[0] + b.bounding[2]) / 2; // x_center
+            const centerBY = (b.bounding[1] + b.bounding[3]) / 2; // y_center
+        
+            // Calculate the Euclidean distance of `a` and `b` to the image center
+            const distanceA = Math.sqrt(Math.pow(centerAX - centerX, 2) + Math.pow(centerAY - centerY, 2));
+            const distanceB = Math.sqrt(Math.pow(centerBX - centerX, 2) + Math.pow(centerBY - centerY, 2));
+        
+            // Sort by distance (smaller distance comes first)
+            return distanceB-distanceA;
+        });
 
-        for(const box of boxes) {
+        for (const box of boxes) {
             const [x, y, w, h] = box.scaled
             console.log("boudning", box.bounding)
             console.log("scaled", box.scaled)
@@ -224,7 +242,13 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
             const blob = await canvasToBlob(canvas)
             canvas.remove()
             box.car = blob
-        
+            const url = URL.createObjectURL(blob);
+
+            // Create a hidden <a> element to trigger the download
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "car.jpg";
+            link.click()
             const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
             cv.cvtColor(roi, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
             const [w1, h1] = divStride(32, matC3.cols, matC3.rows);
@@ -298,8 +322,8 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     }
 
                     console.log("plate within", box2)
-                    const [cropX,cropY,cropWidth,cropHeight] = [
-                        x,y,w-x,h-y
+                    const [cropX, cropY, cropWidth, cropHeight] = [
+                        x, y, w - x, h - y
                     ]
                     const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
                     const thecar = box.car
@@ -318,7 +342,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     ctx.putImageData(imgData, 0, 0);
                     const blob = await canvasToBlob(canvas)
                     canvas.remove()
-                    box.plate.image = blob                
+                    box.plate.image = blob
                     const url = URL.createObjectURL(blob);
 
                     // Create a hidden <a> element to trigger the download
@@ -347,14 +371,14 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     const height_scale1 = src.rows / 70
                     const matPad = new cv.Mat();
                     cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
-                    cv.resize(matPad, matPad, new cv.Size(140,70))
+                    cv.resize(matPad, matPad, new cv.Size(140, 70))
 
-                    const input = new Uint8Array(matPad.data); 
+                    const input = new Uint8Array(matPad.data);
                     // src.delete();
                     roi.delete()
                     matC3.delete();
                     matPad.delete();
-                    const slots = 6
+                    const slots = 8
                     const tensorShape = [slots, 70, 140, 1];
                     const tensorData = new Uint8Array(slots * 70 * 140 * 1);
 
@@ -365,17 +389,20 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
                     // Create the tensor
                     const tensor = new Tensor("uint8", tensorData, tensorShape);
-                    const {concatenate} = await ocr.run({input: tensor})
+                    const { concatenate } = await ocr.run({ input: tensor })
                     console.log("concat", concatenate.data)
                     const totalElements = concatenate.data.length;
                     const alphabetLength = alphabet.length;
                     const batchSize = slots * alphabetLength;
                     const reshaped = concatenate
-                    const predictionIndices:number[][] = [];
                     const data = reshaped.data; // Access the raw data as a Float32Array
+                    const platesWithProbabilities = [];
+
                     for (let b = 0; b < batchSize; b++) {
                         const batchStart = b * slots * alphabetLength;
-                        const batchIndices:number[] = [];
+                        const batchIndices: number[] = [];
+                        const slotProbabilities: number[] = [];
+
                         for (let s = 0; s < slots; s++) {
                             const slotStart = batchStart + s * alphabetLength;
                             const slotData = data.slice(slotStart, slotStart + alphabetLength);
@@ -383,37 +410,107 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                             // Find the index of the maximum value in this slot
                             const maxIndex = slotData.reduce((maxIdx, value, idx, array) =>
                                 value > array[maxIdx] ? idx : maxIdx, 0);
-                            batchIndices.push(maxIndex);
+
+                            const maxValue = Math.max(...slotData); // Get the probability of the max index
+
+                            batchIndices.push(maxIndex); // Store the character index
+                            slotProbabilities.push(maxValue); // Store the slot's probability
                         }
-                        predictionIndices.push(batchIndices);
+
+                        // Step 3: Convert indices to characters
+                        const plateChars = batchIndices.map(index => alphabet[index]);
+                        const plate = plateChars.join("");
+
+                        // Calculate overall plate probability (average)
+                        const averageProbability = slotProbabilities.reduce((a, b) => a + b, 0) / slotProbabilities.length;
+
+                        // Add to platesWithProbabilities array
+                        platesWithProbabilities.push({
+                            plate, // Plate string
+                            probabilities: slotProbabilities, // Individual slot probabilities
+                            averageProbability, // Average probability of the plate
+                        });
                     }
 
-                    // Step 3: Convert the model alphabet into an array
-                    const alphabetArray = Array.from(alphabet);
-
-                    // Step 4: Map indices to characters
-                    const predictions = predictionIndices.map(batch =>
-                        batch.map(index => alphabetArray[index])
-                    );
-
-                    console.log("array" , alphabetArray)
-                    const plateChars = predictionIndices.map(batch =>
-                        batch.map(index => alphabetArray[index])
-                    );
-                    const plates = plateChars.map(row => row.join(""));
-                    const probs = predictions.map(row => Math.max(...row.map(parseFloat)));
-                    // console.log("prediction indexes", plateChars)
-
-                    // console.log("predictoins", predictions)
-
-                    console.log(plates)
-                    console.log(probs)
+                    // Step 4: Output
+                    console.log("Plates with Probabilities:", platesWithProbabilities);
                     // console.log(concatenate)
+                    //MAGIC
+                    const matC4 = new cv.Mat(src.rows, src.cols, cv.CV_8UC3); // new image matrix
+                    cv.cvtColor(src, matC4, cv.COLOR_RGBA2RGB); // RGBA to BGR
+                    const [w4, h4] = divStride(32, matC4.cols, matC4.rows);
+                    cv.resize(matC4, matC4, new cv.Size(w4, h4))
+                    const maxSize2 = Math.max(matC4.rows, matC4.cols)
+                    const xPad2 = maxSize2 - matC4.cols;
+                    const xRatio2 = maxSize2 / matC4.cols;
+                    const yPad2 = maxSize2 - matC4.rows;
+                    const yRatio2 = maxSize2 / matC4.rows;
+                    const width_scale2 = src.cols / 160
+                    const height_scale2 = src.rows / 160
+                    const matPad2 = new cv.Mat();
+                    cv.copyMakeBorder(matC4, matPad2, 0, yPad2, 0, xPad2, cv.BORDER_CONSTANT)
+                    cv.resize(matPad2, matPad2, new cv.Size(160, 160))
+                    const input3 = cv.blobFromImage(matPad2,
+                        1 / 255.0,
+                        new cv.Size(160, 160),
+                        new cv.Scalar(0, 0, 0),
+                        false,
+                        false
+                    )
+                    //ENDMAGICc\
+                    console.log("before run")
+                    matPad2.delete()
+                    matC4.delete()
+
+                    const config = new Tensor("float32", new Float32Array(
+                        [
+                            yoloSegClasses,
+                            topk,
+                            iouThreshold,
+                            scoreThreshold
+                        ]
+                    ))
+                    const plateClassTensor = new Tensor("float32", input3.data32F, [1, 3, 160, 160]);
+                    const res = await plateClass.run({ images: plateClassTensor });
+                    const outputTensor = res["output0"]
+                    const data2 = outputTensor.data as Float32Array; // Access the raw data
+                    const batchSize2 = outputTensor.dims[0]; // Should be 1 for this case
+                    const outputLength = outputTensor.dims[1]; // Should be 7 for this case
+
+                    if (batchSize2 !== 1) {
+                        throw new Error("Batch size other than 1 is not supported");
+                    }
+
+                    // Assuming data is [x_center, y_center, width, height, class_prob_1, class_prob_2, ...]
+                    const xCenter = data2[0];
+                    const yCenter = data2[1];
+                    const width = data2[2];
+                    const height = data2[3];
+
+                    // Class probabilities start from index 4
+                    const classProbabilities = data2.slice(4);
+
+                    // Get the most likely class index and probability
+                    const maxProbIndex = classProbabilities.reduce(
+                        (maxIdx, value, idx, array) => (value > array[maxIdx] ? idx : maxIdx),
+                        0
+                    );
+                    const maxProbability = classProbabilities[maxProbIndex];
+
+                    // Log the decoded results
+                    console.log("Bounding Box:");
+                    console.log(`  x_center: ${xCenter}, y_center: ${yCenter}`);
+                    console.log(`  width: ${width}, height: ${height}`);
+                    console.log(`Most likely class index: ${maxProbIndex}`);
+                    console.log(`Probability of the class: ${maxProbability}`);
+
                 }
             }
-
+            break;
         }
-        src.delete()
+        if (src) {
+            src.delete()
+        }
     }
 
 
@@ -425,7 +522,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
     }
 };
 
-function canvasToBlob(canvas:HTMLCanvasElement, type = "image/jpeg", quality = 1): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 1): Promise<Blob> {
     return new Promise((resolve, reject) => {
         canvas.toBlob(blob => {
             if (blob) {
