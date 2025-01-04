@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.3.1",
+    "@mui/material": "^6.3.1",
     "@techstark/opencv-js": "^4.10.0-release.1",
     "@types/exif-js": "^2.3.1",
     "exif-js": "^2.3.0",

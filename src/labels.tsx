@@ -11,7 +11,7 @@ export const yoloClass:YoloSegMap = {
     "00":1,
     "NJ":2,
     "NY":3,
-    "NYPD":4,
+    "NY_PD":4,
     "NY_TLC":5,
     "PA":6
 }
