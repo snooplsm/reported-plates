@@ -70,9 +70,9 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
   };
 
   useEffect(() => {
-    let fontSize = "3.9";
+    let fontSize = "3.9rem";
     if (plate.text && plate.text.length > 6) {
-      fontSize = "3.5";
+      fontSize = "3.5rem";
     }
     const state = plate.state as State
     const font = stateColorsText[state] || "#000";

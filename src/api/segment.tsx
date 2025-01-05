@@ -251,13 +251,13 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const blob = await canvasToBlob(canvas)
                 canvas.remove()
                 box.car = blob
-                // const url = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(blob);
 
                 // Create a hidden <a> element to trigger the download
-                // const link = document.createElement("a");
-                // link.href = url;
-                // link.download = "car.jpg";
-                // link.click()
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "car.jpg";
+                link.click()
                 const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
                 cv.cvtColor(roi, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
                 const [w1, h1] = divStride(32, matC3.cols, matC3.rows);
@@ -292,6 +292,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     const h1 = predictions.data[i + 4] as number
                     const confidence = predictions.data[i + 6] as number
                     let box1 = [x1, y1, w1, h1]
+                    console.log("xPad ",xPad, " yPad ", yPad, " xRatio ", xRatio, " yRatio ", yRatio)
                     const [x2, y2, w2, h2] = overflowBoxes(
                         [
                             Math.floor(box1[0] * xRatio), // upscale left
@@ -313,11 +314,17 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             probability: confidence                        
                         }
 
-                        const [cropX, cropY, cropWidth, cropHeight] = [
+                        let [cropX, cropY, cropWidth, cropHeight] = [
                             x, y, w - x, h - y
                         ]
+                        if(cropWidth<=0) {
+                            cropWidth = w
+                        }
+                        if(cropHeight<0) {
+                            cropHeight = h
+                        }
                         const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
-                        let roid = await blobToMat(box.car as Blob)
+                        let roid = await blobToMat(box.car as Blob)                    
                         let roi = roid.roi(rect).clone()
                         roid.delete()
                         let canvas = document.createElement('canvas') as HTMLCanvasElement;
@@ -341,12 +348,12 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         const url = URL.createObjectURL(blob);
 
                         // Create a hidden <a> element to trigger the download
-                        // const link = document.createElement("a");
-                        // link.href = url;
-                        // link.download = "plate.jpg";
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = "plate.jpg";
 
                         // Trigger the download
-                        // link.click();
+                        link.click();
 
                         // Clean up the temporary URL
                         URL.revokeObjectURL(url);                    
@@ -505,7 +512,18 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
             if (src) {
                 src.delete()
             }
-
+            boxes = boxes.sort((a, b) => {
+                const aHasText = a.plate?.text ? 1 : 0;
+                const bHasText = b.plate?.text ? 1 : 0;
+              
+                // If both or neither have `plate.text`, maintain their relative order
+                if (aHasText === bHasText) {
+                  return 0; // No change in order
+                }
+              
+                // Prioritize items with `plate.text`
+                return bHasText - aHasText; // Higher value (bHasText) comes first
+            })
             resolve(boxes)
             console.log(boxes)
         }

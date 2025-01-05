@@ -215,7 +215,7 @@ function App() {
             </Box>
           </Box>
         </Box><br />
-        {files && files.map(file => <DetectView file={file} boxes={boxes} />)}<br/>
+        {files && files.map((file,index) => <DetectView key={index.toString()} file={file} boxes={boxes} />)}<br/>
         {dateOfIncident?.toString()}<br/>
         {location?.features[0].properties.label}
       </div>

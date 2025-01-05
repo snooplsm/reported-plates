@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
 import LicensePlate from './LicensePlate';
+import LicensePlateImage from './LicensePlateImage';
 
 type DetectProps = {
     file: File; // The title displayed on the card
@@ -36,6 +37,7 @@ const DetectView:React.FC<DetectProps> = ({file,boxes}) => {
                 height: "auto", // Maintain aspect ratio
             }} />
             {plate && <LicensePlate plate={plate}/>}
+            {plate && plate.image && <LicensePlateImage image={plate.image}/> }
             </Box>
         )
 }
