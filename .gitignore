@@ -1,0 +1,67 @@
+# Node.js dependencies
+node_modules/
+
+# Build directories
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDEs and Editors
+# JetBrains IDEs (WebStorm, IntelliJ, etc.)
+.idea/
+# VSCode settings
+.vscode/
+*.code-workspace
+# Vim swap files
+*.swp
+# Mac-specific file attributes
+.AppleDouble
+.LSOverride
+
+# Cache and output files
+# Parcel-bundler cache
+.cache/
+# Next.js build cache
+.next/
+# Webpack cache
+.webpack/
+# TypeScript cache
+.tsbuildinfo
+# Coverage reports
+coverage/
+# Cypress test outputs
+cypress/screenshots/
+cypress/videos/
+
+# Dependency directory
+jspm_packages/
+
+# Temporary files
+tmp/
+temp/
+
+# Compiled files
+*.log
+*.out
+*.class
+
+# Other
+!README.md
+/reported/
