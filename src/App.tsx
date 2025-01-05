@@ -21,6 +21,10 @@ function App() {
 
   const [boxes, setBoxes] = useState<DetectBox[]>()
 
+  const [location, setLocation] = useState<GeoSearchResponse>()
+
+  const [dateOfIncident, setDateOfIncident] = useState<Date>()
+
   const [loaded, setLoaded] = useState(false)
 
   const [isDragging, setIsDragging] = useState(false);
@@ -85,7 +89,15 @@ function App() {
     console.log(tags)
     const { imageDate: DateTimeOriginal } = tags;
     const unprocessedTagValue = tags['DateTimeOriginal']?.value;
-
+    const offsetTime = tags['OffsetTime']?.value
+    if(offsetTime && unprocessedTagValue) {
+      const dateWithZone = `${unprocessedTagValue}${offsetTime}`.replace(/^(\d{4}):(\d{2}):/, '$1-$2-').replace(' ', 'T');
+      const dateTime = new Date(dateWithZone)
+      console.log(dateTime)
+      setDateOfIncident(dateTime)
+    } else if (unprocessedTagValue) {
+      
+    }
     const latitude =
       tags['GPSLatitudeRef']?.description?.toLowerCase() === 'south latitude'
         ? -Math.abs(parseFloat(tags['GPSLatitude']?.description || '0'))
@@ -101,7 +113,9 @@ function App() {
     const data = cachedGeo ? cachedGeo : await fetchGeoData(latitude, longitude);
     if (data && data?.features?.[0]?.properties?.label?.length > 0) {
       reported.set(ReportedKeys.Geo, data, hash)
+      setLocation(data)
     }
+    
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLInputElement>) => {
@@ -203,7 +217,9 @@ function App() {
             </Box>
           </Box>
         </Box><br />
-        {files && files.map(file => <DetectView file={file} boxes={boxes} />)}
+        {files && files.map(file => <DetectView file={file} boxes={boxes} />)}<br/>
+        {dateOfIncident?.toString()}<br/>
+        {location?.features[0].properties.label}
       </div>
     </ThemeProvider>
   )

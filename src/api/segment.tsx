@@ -148,7 +148,6 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
             const numClass = yoloSegClasses
 
             let boxes: DetectBox[] = []; // ready to draw boxes
-
             // looping through output
             for (let idx = 0; idx < selected.dims[1]; idx++) {
                 const data = selected.data.slice(idx * selected.dims[2], (idx + 1) * selected.dims[2]) as Float32Array; // get rows
@@ -187,7 +186,7 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     w * width_scale,
                     h * height_scale
                 ]
-                if (score >= .7) {
+                if (score >= .7 && w>60 && h>60) {
                     boxes.push({
                         file: file,
                         label: yoloSegIndexToLabel[label],
@@ -201,27 +200,36 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                     }); // update boxes to draw later
                 }
             }
+            console.log(boxes.map(x=>x.bounding))
             boxes = boxes.sort((a, b) => {
-                // Calculate the image center
+                // Image center
                 const centerX = modelWidth / 2;
                 const centerY = modelHeight / 2;
-
-                // Calculate the center of bounding box `a`
-                const centerAX = (a.bounding[0] + a.bounding[2]) / 2; // x_center
-                const centerAY = (a.bounding[1] + a.bounding[3]) / 2; // y_center
-
-                // Calculate the center of bounding box `b`
-                const centerBX = (b.bounding[0] + b.bounding[2]) / 2; // x_center
-                const centerBY = (b.bounding[1] + b.bounding[3]) / 2; // y_center
-
-                // Calculate the Euclidean distance of `a` and `b` to the image center
+            
+                // Box A center
+                const centerAX = (a.scaled[0] + a.scaled[2]) / 2; // x_center
+                const centerAY = (a.scaled[1] + a.scaled[3]) / 2; // y_center
+            
+                // Box B center
+                const centerBX = (b.scaled[0] + b.scaled[2]) / 2; // x_center
+                const centerBY = (b.scaled[1] + b.scaled[3]) / 2; // y_center
+            
+                // Calculate distances to center
                 const distanceA = Math.sqrt(Math.pow(centerAX - centerX, 2) + Math.pow(centerAY - centerY, 2));
                 const distanceB = Math.sqrt(Math.pow(centerBX - centerX, 2) + Math.pow(centerBY - centerY, 2));
-
-                // Sort by distance (smaller distance comes first)
-                return distanceB - distanceA;
+            
+                // Area of the boxes
+                const areaA = a.scaled[2] * a.scaled[3];
+                const areaB = b.scaled[2] * b.scaled[3];
+            
+                // If distances are close, sort by area; otherwise, sort by distance
+                if (Math.abs(distanceA - distanceB) < 50) {
+                    return areaB - areaA; // Larger area comes first
+                } else {
+                    return distanceA - distanceB; // Closer distance comes first
+                }
             });
-
+            console.log(boxes.map(x=>x.bounding))
             for (const box of boxes) {
                 const [x, y, w, h] = box.scaled
                 console.log("boudning", box.bounding)
@@ -244,10 +252,10 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                 const url = URL.createObjectURL(blob);
 
                 // Create a hidden <a> element to trigger the download
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = "car.jpg";
-                link.click()
+                // const link = document.createElement("a");
+                // link.href = url;
+                // link.download = "car.jpg";
+                // link.click()
                 const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
                 cv.cvtColor(roi, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
                 const [w1, h1] = divStride(32, matC3.cols, matC3.rows);
@@ -350,12 +358,12 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
                         const url = URL.createObjectURL(blob);
 
                         // Create a hidden <a> element to trigger the download
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = "plate.jpg";
+                        // const link = document.createElement("a");
+                        // link.href = url;
+                        // link.download = "plate.jpg";
 
                         // Trigger the download
-                        link.click();
+                        // link.click();
 
                         // Clean up the temporary URL
                         URL.revokeObjectURL(url);
@@ -508,12 +516,11 @@ export const segment = async (file: File): Promise<VehicleBoxes[]> => {
 
                     }
                 }
-
-                break;
             }
             if (src) {
                 src.delete()
             }
+
             resolve(boxes)
             console.log(boxes)
         }
