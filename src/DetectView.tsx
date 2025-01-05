@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
 import LicensePlate from './LicensePlate';

@@ -9,7 +9,7 @@ import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, segment } from './api/segment';
 import Box from '@mui/material/Box';
 import PhotoAlbumIcon from "@mui/icons-material/PhotoLibrary";
-import { CssBaseline, Icon, IconButton, ThemeProvider, Typography, useTheme } from "@mui/material";
+import { CssBaseline, Icon, ThemeProvider, Typography} from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 
@@ -59,13 +59,13 @@ function App() {
     if (!initialized) {
       initialized = true
     }
-    const all = await downloadAll()
+    await downloadAll(setLoading)
     setLoaded(true)
   }
 
-  const handleFilesChange = async (e: React.DragEvent<HTMLInputElement>) => {
-    handleFiles(e.currentTarget.files)
-  }
+  // const handleFilesChange = async (e: React.DragEvent<HTMLInputElement>) => {
+  //   handleFiles(e.currentTarget.files)
+  // }
 
   const handleFiles = async (filelist: FileList | null) => {
     if (filelist == null) {
@@ -87,7 +87,6 @@ function App() {
     console.log("hash", hash)
     const tags = await ExifReader.load(file);
     console.log(tags)
-    const { imageDate: DateTimeOriginal } = tags;
     const unprocessedTagValue = tags['DateTimeOriginal']?.value;
     const offsetTime = tags['OffsetTime']?.value
     if(offsetTime && unprocessedTagValue) {
@@ -130,7 +129,6 @@ function App() {
     }
     handleFiles(files)
   }
-  const theme2 = useTheme();
   return (
 
     <ThemeProvider theme={theme}>
@@ -191,7 +189,7 @@ function App() {
                 display: "flex",
                 alignItems: "center",
                 gap: "0.5rem"
-              }}><Icon sx={{ paddingBottom: '2.1rem' }} color={theme.palette.gunmetal.main} aria-label="gallery">
+              }}><Icon sx={{ paddingBottom: '2.1rem',color: theme.palette.gunmetal.main }}  aria-label="gallery">
                   <PhotoAlbumIcon sx={{ fontSize: 16 }} />
                 </Icon>
                 <Typography sx={{

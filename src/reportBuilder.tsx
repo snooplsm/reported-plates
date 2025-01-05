@@ -17,11 +17,12 @@ const steps = Object.values(BuildReportFlow).filter(value => typeof value === 'n
 type ProgressListener = (status: BuildReportFlow, steps: number, data:any|null) => void;
 
 export const buildReport = (file:File, listener:ProgressListener|null=null) => {
-    return new Promise<Report>(async (resolve, reject) => {
+    return new Promise<Report>(async (resolve) => {
         listener?.(BuildReportFlow.pre_hash,steps,null);
         const hash = await getFileHash(file)
         listener?.(BuildReportFlow.hash,steps,hash)
         const tags = await ExifReader.load(file);
         listener?.(BuildReportFlow.exif,steps,tags)
+        resolve({})
     });
 }

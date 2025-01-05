@@ -16,79 +16,83 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
   const [bottomTextColor, setBottomTextColor] = useState("#FFF")
   const [bottomBgColor, setBottomBgColor] = useState("")
   const [topBgColor, setTopBgColor] = useState("")
+  const [fontSize,setFontSize] = useState("")
 
-  const stateColorsText = {
-    'NY': "#0B0C14", // Blue
-    'PA': "#0E1756", // Yellow
-    'NJ': "#000", // Green
-    'CT': "#0A142E", // Orange
+  type State = "NY" | "PA" | "NJ" | "CT";
+
+  const stateColorsText: Record<State, string> = {
+    NY: "#0B0C14",
+    PA: "#0E1756",
+    NJ: "#000",
+    CT: "#0A142E",
   };
 
-  const stateColorsBG = {
-    'NJ': "linear-gradient(to bottom, #FFF44F, #FFFFFF)",
-    'NY': "#FFF",
-    'CT': "linear-gradient(to bottom, #ADD8E6, #FFFFFF)",
-    'PA': "#FFF"
-  }
+  const stateColorsBG: Record<State, string> = {
+    NJ: "linear-gradient(to bottom, #FFF44F, #FFFFFF)",
+    NY: "#FFF",
+    CT: "linear-gradient(to bottom, #ADD8E6, #FFFFFF)",
+    PA: "#FFF",
+  };
 
-  const stateBottomText = {
-    'NYtrue': 'TL&C',
-    'NYfalse': 'EXCELISOR',
-    'PA': 'visitPA.com',
-    'NJ': 'Garden State',
-    'CT': 'Constitution State'
-  }
+  const stateBottomText: Record<State, (isTlc: boolean) => string> = {
+    NY: (isTlc) => (isTlc ? "TL&C" : "EXCELSIOR"),
+    PA: () => "visitPA.com",
+    NJ: () => "Garden State",
+    CT: () => "Constitution State",
+  };
 
-  const stateTopText = {
-    'NY': 'NEW YORK',
-    'PA': 'PENNSYLVANIA',
-    'NJ': 'NEW JERSEY',
-    'CT': 'CONNECTICUT'
-  }
+  const stateTopText: Record<State, string> = {
+    NY: "NEW YORK",
+    PA: "PENNSYLVANIA",
+    NJ: "NEW JERSEY",
+    CT: "CONNECTICUT",
+  };
 
-  const stateBottomTextColor = {
-    'NY': '#ED9C36',
-    'PA': '#000',
-    'NJ': '#000',
-    'CT': ''
-  }
+  const stateBottomTextColor: Record<State, string> = {
+    NY: "#ED9C36",
+    PA: "#000",
+    NJ: "#000",
+    CT: "",
+  };
 
-  const stateTopBgColor = {
-    'NY': '#00000000',
-    'PA': '#0E1756',
-    'NJ': '#00000000',
-    'CT': '#00000000'
-  }
+  const stateTopBgColor: Record<State, string> = {
+    NY: "#00000000",
+    PA: "#0E1756",
+    NJ: "#00000000",
+    CT: "#00000000",
+  };
 
-  const stateBottomBgColor = {
-    'NY': '#00000000',
-    'PA': '#F0CA38',
-    'NJ': '#00000000',
-    'CT': '#00000000'
-  }
+  const stateBottomBgColor: Record<State, string> = {
+    NY: "#00000000",
+    PA: "#F0CA38",
+    NJ: "#00000000",
+    CT: "#00000000",
+  };
 
   useEffect(() => {
-    let fontSize = "3.9"
-    if (plate.text && plate.text?.length > 6) {
-      fontSize = "3.5"
+    let fontSize = "3.9";
+    if (plate.text && plate.text.length > 6) {
+      fontSize = "3.5";
     }
-    const font = stateColorsText[plate.state || ""] || "#000"
-    const bg = stateColorsBG[plate.state || ""] || "#FFF"
-    const topText = stateTopText[plate.state || ""] || ""
-    const topTextColor = stateTopText[plate.state || ""] || ""
-    const bottomTextColor = "#000"
-    const topBgColor = stateTopBgColor[plate.state||""] || ""
-    const bottomBgColor = stateBottomBgColor[plate.state||""] || ""
-    setTopTextColor(topTextColor)
-    setBottomTextColor(bottomTextColor)
-    setBottomBgColor(bottomBgColor)
-    setTopBgColor(topBgColor)
-    const bottomText = stateBottomText[plate.state || ""] || stateBottomText[`${plate.state}${plate.tlc || false}`] || ""
-    setColor(font)
-    setBgColor(bg)
-    setTopText(topText)
-    setBottomText(bottomText)
-  }, [plate])
+    const state = plate.state as State
+    const font = stateColorsText[state] || "#000";
+    const bg = stateColorsBG[state] || "#FFF";
+    const topText = stateTopText[state] || "";
+    const topTextColor = stateColorsText[state] || "";
+    const topBgColor = stateTopBgColor[state] || "";
+    const bottomBgColor = stateBottomBgColor[state] || "";
+    const bottomTextColor = stateBottomTextColor[state] || "";
+    setTopTextColor(topTextColor);
+    setBottomTextColor(bottomTextColor);
+    setBottomBgColor(bottomBgColor);
+    setTopBgColor(topBgColor);
+    const bottomText = stateBottomText[state](plate.tlc||false);
+    setColor(font);
+    setBgColor(bg);
+    setTopText(topText);
+    setBottomText(bottomText);
+    setFontSize(fontSize)
+  }, [plate]);
 
   return (
     <Box
@@ -123,7 +127,7 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
     >
         <Typography
           sx={{
-            fontSize: "3.9rem",
+            fontSize: fontSize,
             fontWeight: 600,
             color: "#0E1756", // Default text color
           }}
