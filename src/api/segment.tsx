@@ -251,78 +251,35 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const blob = await canvasToBlob(canvas)
                 canvas.remove()
                 box.car = blob
-                const url = URL.createObjectURL(blob);
+                // const url = URL.createObjectURL(blob);
 
                 // Create a hidden <a> element to trigger the download
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = "car.jpg";
-                link.click()
-                const matC3 = new cv.Mat(roi.rows, roi.cols, cv.CV_8UC3); // new image matrix
-                cv.cvtColor(roi, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
-                const [w1, h1] = divStride(32, matC3.cols, matC3.rows);
-                cv.resize(matC3, matC3, new cv.Size(w1, h1))
-                const maxSize = Math.max(matC3.rows, matC3.cols)
-                const xPad = maxSize - matC3.cols;
-                const xRatio = maxSize / matC3.cols;
-                const yPad = maxSize - matC3.rows;
-                const yRatio = maxSize / matC3.rows;
-                const width_scale = roi.cols / modelWidth
-                const height_scale = roi.rows / modelHeight
-                const matPad = new cv.Mat();
-                cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
-                const input = cv.blobFromImage(matPad,
-                    1 / 255.0,
-                    new cv.Size(modelWidth, modelHeight),
-                    new cv.Scalar(0, 0, 0),
-                    true,
-                    false
-                )
-                matC3.delete()
-                matPad.delete()
-                const tensor = new Tensor("float32", input.data32F, modelInputShape);
+                // const link = document.createElement("a");
+                // link.href = url;
+                // link.download = "car.jpg";
+                // link.click()
+                const letter = letterbox(roi, [640,640])
+                
+                const tensor = await matToOnnxTensor(letter.image)
+                // matC3.delete()
+                // matPad.delete()
+                // const tensor = new Tensor("float32", input, modelInputShape);
                 const { output0: predictions } = await plate.run({
                     images: tensor
                 })
-
-                for (let i = 0; i < predictions.data.length; i += 7) {
-                    const x1 = predictions.data[i + 1] as number
-                    const y1 = predictions.data[i + 2] as number
-                    const w1 = predictions.data[i + 3] as number
-                    const h1 = predictions.data[i + 4] as number
-                    const confidence = predictions.data[i + 6] as number
-                    let box1 = [x1, y1, w1, h1]
-                    console.log("xPad ",xPad, " yPad ", yPad, " xRatio ", xRatio, " yRatio ", yRatio)
-                    const [x2, y2, w2, h2] = overflowBoxes(
-                        [
-                            Math.floor(box1[0] * xRatio), // upscale left
-                            Math.floor(box1[1] * yRatio), // upscale top
-                            Math.floor(box1[2] * xRatio), // upscale width
-                            Math.floor(box1[3] * yRatio), // upscale height
-                        ],
-                        maxSize
-                    ); // upscale boxes
-                    if (confidence > .2) {
-                        let box2: [x: number, y: number, w: number, h: number] = [x2 * width_scale,
-                        y2 * height_scale,
-                        w2 * width_scale,
-                        h2 * height_scale]                        
-                        const [x, y, w, h] = box2
-
+                const padding = letter.pad
+                const ratio = letter.scale
+                const result = convertToDetectionResult(predictions.data as Float32Array, ['plate','fuhghedaboutit'], ratio, padding)
+                for(const k of result) {
+                    if(k.confidence> .2) {
                         box.plate = {
-                            box: box2,
-                            probability: confidence                        
+                            box: [k.boundingBox.x1,k.boundingBox.y1,k.boundingBox.x2,k.boundingBox.y2],
+                            probability: k.confidence                        
                         }
-
                         let [cropX, cropY, cropWidth, cropHeight] = [
-                            x, y, w - x, h - y
+                            k.boundingBox.x1, k.boundingBox.y1, k.boundingBox.x2-k.boundingBox.x1, k.boundingBox.y2-k.boundingBox.x1
                         ]
-                        if(cropWidth<=0) {
-                            cropWidth = w
-                        }
-                        if(cropHeight<0) {
-                            cropHeight = h
-                        }
+                    
                         const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
                         let roid = await blobToMat(box.car as Blob)                    
                         let roi = roid.roi(rect).clone()
@@ -338,11 +295,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         canvas.height = imgData.height;
                         ctx.putImageData(imgData, 0, 0);
                         const blob = await canvasToBlob(canvas)
-                        box.plate = {
-                            box: box2,
-                            probability: confidence,
-                            image: blob
-                        }
+                        box.plate.image = blob
                         canvas.remove()
                         box.plate.image = blob
                         const url = URL.createObjectURL(blob);
@@ -353,7 +306,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         link.download = "plate.jpg";
 
                         // Trigger the download
-                        link.click();
+                        // link.click();
 
                         // Clean up the temporary URL
                         URL.revokeObjectURL(url);                    
@@ -504,8 +457,11 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
                             plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
                             plate.stateConfidence = maxProbability
-                        }
 
+                            if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
+                                plate.text = plate.text.replace(/I/g, '1');
+                            }
+                        }
                     }
                 }
             }
@@ -531,6 +487,88 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
     })
 };
 
+type BoundingBox = {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+};
+
+type DetectionResult = {
+    label: string;
+    confidence: number;
+    boundingBox: BoundingBox;
+};
+
+/**
+ * Convert raw model output into a list of detection result objects.
+ * 
+ * @param predictions - Model predictions in the form [X, x1, y1, x2, y2, class_id, score].
+ * @param classLabels - List of class labels corresponding to the class IDs.
+ * @param ratio - Scaling ratio used during preprocessing.
+ * @param padding - Tuple of padding values (dw, dh) added during preprocessing.
+ * @param scoreThreshold - Minimum confidence score to include a detection result.
+ * @returns A list of DetectionResult objects.
+ */
+function convertToDetectionResult(
+    predictions: Float32Array,
+    classLabels: string[],
+    ratio: [number, number],
+    padding: [number, number],
+    scoreThreshold: number = 0.5
+): DetectionResult[] {
+    const results: DetectionResult[] = [];
+    const numDetections = predictions.length / 7;
+
+    for (let i = 0; i < numDetections; i++) {
+        const startIndex = i * 7;
+
+        // Extract bounding box, class ID, and score
+        const bbox = [
+            predictions[startIndex + 1],
+            predictions[startIndex + 2],
+            predictions[startIndex + 3],
+            predictions[startIndex + 4],
+        ];
+        const classId = Math.floor(predictions[startIndex + 5]);
+        const score = predictions[startIndex + 6];
+
+        // Only include results that meet the score threshold
+        if (score < scoreThreshold) continue;
+
+        console.log("ratioX:", ratio[0], "ratioY:", ratio[1]);
+        console.log("paddingX:", padding[0], "paddingY:", padding[1]);
+        console.log("x1:", bbox[0], "x2:", bbox[1], "y1:", bbox[2], "y2:", bbox[3]);
+
+        // Adjust bounding box from scaled image back to original image size
+        bbox[0] = (bbox[0] - padding[0]) / ratio[0];
+        bbox[1] = (bbox[1] - padding[1]) / ratio[1];
+        bbox[2] = (bbox[2] - padding[0]) / ratio[0];
+        bbox[3] = (bbox[3] - padding[1]) / ratio[1];
+
+        // Map class_id to label if available
+        const label = classLabels[classId] || String(classId);
+
+        // Create detection result object
+        const boundingBox: BoundingBox = {
+            x1: Math.round(bbox[0]),
+            y1: Math.round(bbox[1]),
+            x2: Math.round(bbox[2]),
+            y2: Math.round(bbox[3]),
+        };
+
+        const detectionResult: DetectionResult = {
+            label: label,
+            confidence: parseFloat(score.toFixed(6)),
+            boundingBox: boundingBox,
+        };
+
+        results.push(detectionResult);
+    }
+
+    return results;
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 1): Promise<Blob> {
     return new Promise((resolve, reject) => {
         canvas.toBlob(blob => {
@@ -540,6 +578,67 @@ function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 
                 reject(new Error("Blob creation failed"));
             }
         }, type, quality);
+    });
+}
+
+// Function to convert cv.Mat to ONNX tensor
+function matToOnnxTensor(mat:Mat, modelInputShape = [1, 3, 640, 640]): Tensor {
+    const [batchSize, channels, height, width] = modelInputShape;
+
+    // Ensure the Mat has 3 channels (BGR to RGB if needed)
+    if (mat.channels() !== 3) {
+        throw new Error("Mat must have 3 channels (RGB/BGR) for this operation.");
+    }
+
+    // Resize to the desired shape (e.g., 160x160)
+    const resizedMat = new cv.Mat();
+    cv.resize(mat, resizedMat, new cv.Size(width, height), 0, 0, cv.INTER_LINEAR);
+
+    // Normalize pixel values to [0, 1]
+    const floatArray = new Float32Array(height * width * channels);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pixel = resizedMat.ucharPtr(y, x); // Get pixel at (x, y)
+            const idx = (y * width + x) * channels;
+            floatArray[idx] = pixel[0] / 255.0; // Red (or Blue if BGR)
+            floatArray[idx + 1] = pixel[1] / 255.0; // Green
+            floatArray[idx + 2] = pixel[2] / 255.0; // Blue (or Red if BGR)
+        }
+    }
+
+    // Free the resized Mat to avoid memory leaks
+    resizedMat.delete();
+
+    // Reshape data to [batch_size, channels, height, width]
+    const reshapedArray = new Float32Array(batchSize * channels * height * width);
+    for (let c = 0; c < channels; c++) {
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idxReshaped = c * height * width + y * width + x;
+                const idxFlat = (y * width + x) * channels + c;
+                reshapedArray[idxReshaped] = floatArray[idxFlat];
+            }
+        }
+    }
+
+    // Create ONNX Tensor
+    return new Tensor("float32", reshapedArray, [batchSize, channels, height, width]);
+}
+
+async function matToBlob(mat:Mat):Promise<Blob> {
+    const canvas = document.createElement("canvas") as HTMLCanvasElement;
+    canvas.width = mat.cols;
+    canvas.height = mat.rows;
+
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const imageData = new ImageData(new Uint8ClampedArray(mat.data), mat.cols, mat.rows);
+    ctx.putImageData(imageData, 0, 0);
+
+    // Convert the canvas to a Blob
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            resolve(blob);
+        }, "image/jpeg"); // You can specify the image format (e.g., JPEG or PNG)
     });
 }
 
@@ -569,6 +668,77 @@ async function blobToMat(blob: Blob): Promise<Mat> {
         reader.onerror = (err) => reject(err);
         reader.readAsDataURL(blob); // Read the Blob as a Data URL
     });
+}
+
+interface LetterboxResult {
+    image: cv.Mat; // The padded and resized image
+    scale: [number, number]; // Scaling factors for width and height
+    pad: [x:number, y:number]; // Padding values for width and height
+}
+
+function letterbox(
+    im: cv.Mat,
+    newShape: [number, number] | number = [640, 640],
+    color: [number, number, number] = [114, 114, 114],
+    scaleup: boolean = true
+): LetterboxResult {
+    // Current shape [height, width]
+    const shape: [number, number] = [im.rows, im.cols];
+
+    // Convert integer newShape to [newShape, newShape] if needed
+    if (typeof newShape === "number") {
+        newShape = [newShape, newShape];
+    }
+
+    // Calculate the scaling ratio and resize the image
+    let r = Math.min(newShape[0] / shape[0], newShape[1] / shape[1]);
+    if (!scaleup) {
+        r = Math.min(r, 1.0);
+    }
+
+    // Calculate new unpadded dimensions and padding
+    const newUnpad: [number, number] = [
+        Math.round(shape[1] * r),
+        Math.round(shape[0] * r),
+    ];
+    const dw = (newShape[1] - newUnpad[0]) / 2; // divide padding into 2 sides
+    const dh = (newShape[0] - newUnpad[1]) / 2;
+
+    // Resize the image to the new unpadded dimensions
+    let resized = new cv.Mat();
+    if (shape[1] !== newUnpad[0] || shape[0] !== newUnpad[1]) {
+        const newSize = new cv.Size(newUnpad[0], newUnpad[1]);
+        cv.resize(im, resized, newSize, 0, 0, cv.INTER_LINEAR);
+    } else {
+        resized = im.clone();
+    }
+
+    if (resized.channels() === 1) {
+        cv.cvtColor(resized,resized, cv.COLOR_GRAY2BGR); // Convert grayscale to BGR
+    } else if (resized.channels() === 4) {
+        cv.cvtColor(resized, resized, cv.COLOR_RGBA2BGR); // Convert RGBA to BGR
+    } else {
+        // roi.copyTo(matC3); // If already 3 channels, just copy
+    }
+
+    // Add padding to maintain the new shape
+    const top = Math.round(dh - 0.1);
+    const bottom = Math.round(dh + 0.1);
+    const left = Math.round(dw - 0.1);
+    const right = Math.round(dw + 0.1);
+
+    let padded = new cv.Mat();
+    const borderColor = new cv.Scalar(color[0], color[1], color[2], 255); // Add alpha channel for RGBA
+    cv.copyMakeBorder(resized, padded, top, bottom, left, right, cv.BORDER_CONSTANT, borderColor);
+
+    // Clean up intermediate Mats to prevent memory leaks
+    resized.delete();
+
+    return {
+        image: padded,
+        scale: [r, r],
+        pad: [dw, dh],
+    };
 }
 
 /*
