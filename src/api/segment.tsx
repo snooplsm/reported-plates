@@ -1,6 +1,6 @@
 import { InferenceSession, Tensor, env } from "onnxruntime-web";
 import { download } from "../utils/download";
-import cv, { Mat } from "@techstark/opencv-js";
+import cv, { Exception, Mat } from "@techstark/opencv-js";
 import { yoloClassIndexToLabel, yoloSegClasses, yoloSegIndexToLabel, yoloSegVehicles } from "../labels";
 
 const models = [
@@ -251,15 +251,17 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const blob = await canvasToBlob(canvas)
                 canvas.remove()
                 box.car = blob
-                // const url = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(blob);
 
                 // Create a hidden <a> element to trigger the download
-                // const link = document.createElement("a");
-                // link.href = url;
-                // link.download = "car.jpg";
-                // link.click()
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "car.jpg";
+                link.click()
+                URL.revokeObjectURL(url)
                 const letter = letterbox(roi, [640,640])
-                
+                roi.delete()
+                await downloadMatAsImage(letter.image)
                 const tensor = await matToOnnxTensor(letter.image)
                 // matC3.delete()
                 // matPad.delete()
@@ -277,13 +279,20 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             probability: k.confidence                        
                         }
                         let [cropX, cropY, cropWidth, cropHeight] = [
-                            k.boundingBox.x1, k.boundingBox.y1, k.boundingBox.x2-k.boundingBox.x1, k.boundingBox.y2-k.boundingBox.x1
+                            k.boundingBox.x1, k.boundingBox.y1, k.boundingBox.x2-k.boundingBox.x1, k.boundingBox.y2-k.boundingBox.y1
                         ]
                     
                         const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
-                        let roid = await blobToMat(box.car as Blob)                    
-                        let roi = roid.roi(rect).clone()
-                        roid.delete()
+                        let roi: cv.Mat;
+                        const roid = await blobToMat(box.car as Blob);
+                        try {                            
+                            roi = roid.roi(rect).clone();
+                            roid.delete()
+                        } catch (e) {
+                            console.log(e);
+                            roi = roid; // Fallback to the original `roid` if the `roi` operation fails
+
+                        }
                         let canvas = document.createElement('canvas') as HTMLCanvasElement;
                         let ctx = canvas.getContext('2d') as CanvasRenderingContext2D
                         let imgData = new ImageData(
@@ -306,7 +315,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         link.download = "plate.jpg";
 
                         // Trigger the download
-                        // link.click();
+                        link.click();
 
                         // Clean up the temporary URL
                         URL.revokeObjectURL(url);                    
@@ -712,14 +721,21 @@ function letterbox(
     } else {
         resized = im.clone();
     }
-
+    console.log("Rows (Height):", resized.rows);
+    console.log("Cols (Width):", resized.cols);
+    console.log("Channels:", resized.channels());
+    console.log("Type:", resized.type()); // E.g., cv.CV_8UC3
     if (resized.channels() === 1) {
-        cv.cvtColor(resized,resized, cv.COLOR_GRAY2BGR); // Convert grayscale to BGR
+        cv.cvtColor(resized, resized, cv.COLOR_GRAY2RGB); // Convert grayscale to BGR
     } else if (resized.channels() === 4) {
-        cv.cvtColor(resized, resized, cv.COLOR_RGBA2BGR); // Convert RGBA to BGR
+        cv.cvtColor(resized, resized, cv.COLOR_RGBA2RGB); // Convert RGBA to BGR
     } else {
         // roi.copyTo(matC3); // If already 3 channels, just copy
     }
+    console.log("Rows (Height):", resized.rows);
+    console.log("Cols (Width):", resized.cols);
+    console.log("Channels:", resized.channels());
+    console.log("Type:", resized.type()); // E.g., cv.CV_8UC3
 
     // Add padding to maintain the new shape
     const top = Math.round(dh - 0.1);
@@ -728,8 +744,7 @@ function letterbox(
     const right = Math.round(dw + 0.1);
 
     let padded = new cv.Mat();
-    const borderColor = new cv.Scalar(color[0], color[1], color[2], 255); // Add alpha channel for RGBA
-    cv.copyMakeBorder(resized, padded, top, bottom, left, right, cv.BORDER_CONSTANT, borderColor);
+    cv.copyMakeBorder(resized, padded, top, bottom, left, right, cv.BORDER_CONSTANT);
 
     // Clean up intermediate Mats to prevent memory leaks
     resized.delete();
@@ -740,7 +755,45 @@ function letterbox(
         pad: [dw, dh],
     };
 }
+async function downloadMatAsImage(mat:cv.Mat, fileName = "image.png") {
 
+    if (mat.channels() !== 3) {
+        console.error("Mat must have exactly 3 channels (BGR).");
+        return;
+    }
+
+    // Step 1: Convert BGR to RGBA
+    const rgbaMat = new cv.Mat();
+    cv.cvtColor(mat, rgbaMat, cv.COLOR_RGB2RGBA); // Convert BGR to RGBA
+
+    // Step 2: Prepare ImageData from Mat
+    const width = rgbaMat.cols;
+    const height = rgbaMat.rows;
+    const imgData = new ImageData(new Uint8ClampedArray(rgbaMat.data), width, height);
+
+    // Step 3: Render on Canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.putImageData(imgData, 0, 0);
+
+    // Step 4: Convert canvas to Blob and download
+    canvas.toBlob((blob) => {
+        if (blob) {
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName; // Specify the file name
+            link.click();
+            URL.revokeObjectURL(link.href); // Clean up
+        } else {
+            console.error("Failed to create Blob from canvas.");
+        }
+    }, "image/png");
+
+    // Cleanup
+    rgbaMat.delete(); // Free OpenCV memory
+}
 /*
 * Handle overflow boxes based on maxSize
 * @param {Number[4]} box box in [x, y, w, h] format
