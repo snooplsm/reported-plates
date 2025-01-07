@@ -185,8 +185,8 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     y * height_scale,
                     w * width_scale,
                     h * height_scale
-                ]
-                if (score >= .7 && w>60 && h>60) {
+                ]            
+                if (score >= .5 && w>60 && h>60) {
                     boxes.push({
                         file: file,
                         label: yoloSegIndexToLabel[label],
@@ -321,7 +321,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         URL.revokeObjectURL(url);                    
 
                         const src = await blobToMat(blob)
-                        const matC3 = new cv.Mat(src.rows, src.cols, cv.CV_8UC1); // new image matrix
+                        const matC3 = new cv.Mat(); // new image matrix
                         cv.cvtColor(src, matC3, cv.COLOR_BGR2GRAY); // RGBA to BGR
                         const [w3, h3] = divStride(32, matC3.cols, matC3.rows);
                         cv.resize(matC3, matC3, new cv.Size(w3, h3))
@@ -332,8 +332,8 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         // const yRatio = maxSize / matC3.rows;
                         // const width_scale1 = src.cols / 140
                         // const height_scale1 = src.rows / 70
-                        const matPad = new cv.Mat();
-                        cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
+                        const matPad = matC3.clone()
+                        // cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
                         cv.resize(matPad, matPad, new cv.Size(140, 70))
 
                         const input = new Uint8Array(matPad.data);
@@ -755,7 +755,7 @@ function letterbox(
         pad: [dw, dh],
     };
 }
-async function downloadMatAsImage(mat:cv.Mat, fileName = "image.png") {
+async function downloadMatAsImage(mat:cv.Mat, fileName = "image.jpg") {
 
     if (mat.channels() !== 3) {
         console.error("Mat must have exactly 3 channels (BGR).");
@@ -789,7 +789,7 @@ async function downloadMatAsImage(mat:cv.Mat, fileName = "image.png") {
         } else {
             console.error("Failed to create Blob from canvas.");
         }
-    }, "image/png");
+    }, "image/jpg", 100);
 
     // Cleanup
     rgbaMat.delete(); // Free OpenCV memory
