@@ -12,7 +12,7 @@ const models = [
     ['ocr', 'global_mobile_vit_v2_ocr']
 ]
 
-env.wasm.wasmPaths = '/'
+env.wasm.wasmPaths = import.meta.env.BASE_URL
 
 let downloaded = false
 
@@ -257,7 +257,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const link = document.createElement("a");
                 link.href = url;
                 link.download = "car.jpg";
-                link.click()
+                // link.click()
                 URL.revokeObjectURL(url)
                 const letter = letterbox(roi, [640,640])
                 roi.delete()
@@ -315,7 +315,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         link.download = "plate.jpg";
 
                         // Trigger the download
-                        link.click();
+                        // link.click();
 
                         // Clean up the temporary URL
                         URL.revokeObjectURL(url);                    
@@ -784,7 +784,7 @@ async function downloadMatAsImage(mat:cv.Mat, fileName = "image.jpg") {
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = fileName; // Specify the file name
-            link.click();
+            // link.click();
             URL.revokeObjectURL(link.href); // Clean up
         } else {
             console.error("Failed to create Blob from canvas.");

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "deploy": "gh-pages -d reported",
-    "predeploy": "vite build",
+    "predeploy": "vite build --base=/reported-plates/",
     "lint": "eslint .",
     "preview": "vite preview"
   },
