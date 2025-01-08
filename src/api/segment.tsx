@@ -1,7 +1,8 @@
 import { InferenceSession, Tensor, env } from "onnxruntime-web";
 import { download } from "../utils/download";
-import cv, { Exception, Mat } from "@techstark/opencv-js";
+import cv, { Mat } from "@techstark/opencv-js";
 import { yoloClassIndexToLabel, yoloSegClasses, yoloSegIndexToLabel, yoloSegVehicles } from "../labels";
+import heic2any from "heic2any";
 
 const models = [
     ['segment', 'yolov8n-seg'],
@@ -96,10 +97,26 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
     return new Promise<DetectBox[]>(async (resolve) => {
         await downloadAll(()=>{})
         const image = new Image()
+        let file2Use:string
+        if(file.type.toLowerCase()==="image/heic") {
+            const uuu = URL.createObjectURL(file)
+            try {
+            const blob:Blob = await (await fetch(uuu)).blob()
+            const converted = await heic2any({blob,
+                toType: "image/jpeg"
+            })
+            file2Use = URL.createObjectURL(converted)
+            } catch(e:Exception) {
+                console.log(e)
+            }
+        } else {
+            file2Use = URL.createObjectURL(file)
+        }
+        image.src = file2Use
 
-        image.src = URL.createObjectURL(file);
-
-
+        image.onerror = (err) => {
+            console.log(err)
+        }
         image.onload = async () => {
             const modelInputShape = [1, 3, 640, 640];
             const src = cv.imread(image)
@@ -129,7 +146,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
             // src.delete();
             matC3.delete();
             matPad.delete();
-            URL.revokeObjectURL(image.src);
+            // URL.revokeObjectURL(image.src);
 
             const tensor = new Tensor("float32", input.data32F, modelInputShape);
             const config = new Tensor("float32", new Float32Array(
@@ -299,7 +316,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             new Uint8ClampedArray(roi.data),
                             roi.cols,
                             roi.rows
-                        );
+                        );                        
                         canvas.width = imgData.width;
                         canvas.height = imgData.height;
                         ctx.putImageData(imgData, 0, 0);
@@ -313,12 +330,59 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         const link = document.createElement("a");
                         link.href = url;
                         link.download = "plate.jpg";
-
                         // Trigger the download
                         // link.click();
 
                         // Clean up the temporary URL
-                        URL.revokeObjectURL(url);                    
+                        URL.revokeObjectURL(url);        
+                        
+                        const blur = new cv.Mat()
+                        cv.medianBlur(roi, blur, 3)
+                        const edges = new cv.Mat()
+                        cv.Canny(blur, edges, 30, 100, 3, true)
+                        const lines = new cv.Mat()
+                        const rho = 1; // Distance resolution in pixels
+                        const theta = Math.PI / 180; // Angle resolution in radians
+                        const threshold = 30; // Accumulator threshold
+                        const minLineLength = roi.rows / 4.0; // Minimum line length
+                        const maxLineGap = roi.cols / 4.0; // Maximum gap between lines
+                        try {
+                            cv.HoughLines(edges, lines, rho, theta, threshold, minLineLength, maxLineGap);
+                        } catch (e) {
+                            console.log(e)
+                        }
+                        let angle = 0.0
+                        let nlines = lines.size
+                        let cnt = 0
+                        if (lines instanceof cv.Mat && lines.rows > 0) {
+                            for (let i = 0; i < lines.rows; i++) {
+                                const x1 = lines.data32S[i * 4];
+                                const y1 = lines.data32S[i * 4 + 1];
+                                const x2 = lines.data32S[i * 4 + 2];
+                                const y2 = lines.data32S[i * 4 + 3];
+                        
+                                // Calculate the angle
+                                const ang = Math.atan2(y2 - y1, x2 - x1);
+                        
+                                // Exclude extreme rotations (30 degrees threshold converted to radians)
+                                if (Math.abs(ang) <= 40 * (Math.PI / 180)) {
+                                    angle += ang;
+                                    cnt += 1;
+                                }
+                            }
+                        }
+                        lines.delete()
+                        edges.delete()
+                        if(cnt==0) {
+                            angle = 0.0
+                        }
+                        if(angle!=0.0) {
+                            // const center = new cv.Point(roi.rows/2,roi.cols/2)
+                            // const rotate = cv.getRotationMatrix2D(center, -angle, 1.0)
+                            // cv.warpAffine(roi, roi, rotate, new cv.Size(roi.cols,roi.rows), cv.INTER_LINEAR)
+                        }
+                        console.log("the nagle is ", angle)
+                                    
 
                         const src = await blobToMat(blob)
                         const matC3 = new cv.Mat(); // new image matrix
@@ -755,7 +819,7 @@ function letterbox(
         pad: [dw, dh],
     };
 }
-async function downloadMatAsImage(mat:cv.Mat, fileName = "image.jpg") {
+export async function downloadMatAsImage(mat:cv.Mat, fileName = "image.jpg", click:boolean=false) {
 
     if (mat.channels() !== 3) {
         console.error("Mat must have exactly 3 channels (BGR).");
@@ -784,7 +848,8 @@ async function downloadMatAsImage(mat:cv.Mat, fileName = "image.jpg") {
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = fileName; // Specify the file name
-            // link.click();
+            if(click)
+                link.click();
             URL.revokeObjectURL(link.href); // Clean up
         } else {
             console.error("Failed to create Blob from canvas.");
