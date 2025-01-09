@@ -13,7 +13,8 @@ import heic2any from "heic2any";
 
 type DetectProps = {
     file: File; // The title displayed on the card
-    boxes?: DetectBox[]
+    boxes?: DetectBox[],
+    onPlate?: (plate:PlateDetection) => {}
 };
 
 enum CanvasOption {
@@ -23,10 +24,11 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
-const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
+const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
+    const [plateOverride, setPlateOverride] = useState<PlateDetection>()
 
     const [scale, setScale] = useState<number>(1); // Track zoom level
     const [offsetX, setOffsetX] = useState(0);
@@ -133,8 +135,10 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
                 const roi = mat.roi(rectRoi)
                 cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
                 mat.delete()
-                const plate = detectPlate(roi)
+                const plate = await detectPlate(roi)
+                setPlateOverride(plate)
                 console.log("plate", plate)
+                roi.delete()
                 // URL.revokeObjectURL(image.src)
             }
             
@@ -350,6 +354,8 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
             </ToggleButtonGroup>
             {plate && <LicensePlate plate={plate} />}
             {plate && plate.image && <LicensePlateImage image={plate.image} />}
+            {plateOverride && <LicensePlate plate={plateOverride} />}            
+            {plateOverride && plateOverride.image && <LicensePlateImage image={plateOverride.image} />}
         </Box>
         )
 }

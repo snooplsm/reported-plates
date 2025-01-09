@@ -531,6 +531,11 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
 
                             if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
                                 plate.text = plate.text.replace(/I/g, '1');
+                                plate.text = plate.text.replace(/L/g, '1');
+                                plate.text = plate.text.replace(/Z/g, '2');
+                                plate.text = plate.text.replace(/G/g, '6');
+                                plate.text = plate.text.replace(/B/g, '2');
+                                plate.text = plate.text.replace(/A/g, '4');
                             }
                         }
                     }
@@ -682,7 +687,7 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
     plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
     plate.stateConfidence = maxProbability
-
+    plate.image = await matToBlob(matC3)
     if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
         plate.text = plate.text.replace(/I/g, '1');
         plate.tlc = true
@@ -847,21 +852,38 @@ function matToOnnxTensor(mat:Mat, modelInputShape = [1, 3, 640, 640]): Tensor {
     return new Tensor("float32", reshapedArray, [batchSize, channels, height, width]);
 }
 
-async function matToBlob(mat:Mat):Promise<Blob> {
+async function matToBlob(roi:Mat):Promise<Blob> {
+    const mat = new cv.Mat()
+    cv.cvtColor(roi,mat,cv.COLOR_RGB2RGBA)
     const canvas = document.createElement("canvas") as HTMLCanvasElement;
     canvas.width = mat.cols;
     canvas.height = mat.rows;
 
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     const imageData = new ImageData(new Uint8ClampedArray(mat.data), mat.cols, mat.rows);
-    ctx.putImageData(imageData, 0, 0);
-
+    ctx.putImageData(imageData, 0, 0);  
+    mat.delete()
     // Convert the canvas to a Blob
     return new Promise((resolve) => {
         canvas.toBlob((blob) => {
             resolve(blob);
         }, "image/jpeg"); // You can specify the image format (e.g., JPEG or PNG)
     });
+}
+
+async function matToImage(roi:Mat): Promise<Blob> {
+    let canvas = document.createElement('canvas') as HTMLCanvasElement;
+    let ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    let imgData = new ImageData(
+        new Uint8ClampedArray(roi.data),
+        roi.cols,
+        roi.rows
+    );                        
+    canvas.width = imgData.width;
+    canvas.height = imgData.height;
+    ctx.putImageData(imgData, 0, 0);
+    const blob = await canvasToBlob(canvas)
+    return blob
 }
 
 async function blobToMat(blob: Blob): Promise<Mat> {
