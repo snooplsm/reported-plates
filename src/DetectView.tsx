@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { DetectBox, downloadMatAsImage, PlateDetection } from './api/segment';
+import { canvasToBlob, DetectBox, detectPlate, downloadMatAsImage, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
 import LicensePlate from './LicensePlate';
 import LicensePlateImage from './LicensePlateImage';
@@ -77,7 +77,7 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
         const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-
+        
         // Adjust coordinates for the canvas scale and offset
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
@@ -85,45 +85,57 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
         setPosition([x, y])
     }
 
+    useEffect(() => {
+        console.log("position changed", position)
+    }, [position])
+
     const onMouseUp = (e: React.MouseEvent) => {
         if(isDragging && boundingBox) {
             const rect = canvasRef.current.getBoundingClientRect();
             const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
             const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
+            const scaleX3 = imgRef.current.naturalWidth / rect.width
+            const scaleY3 = imgRef.current.naturalHeight / rect.height
             const bbox = boundingBox
             const bbox2 = bbox.map(x => x * scale);
-            
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
             const image = new Image()
-            image.src = URL.createObjectURL(file);
+            image.src = imageSrc
             image.onload = async () => {
                 console.log(bbox)
                 const mat = cv.imread(image)
-                console.log("bounding box", bbox)
+                console.log("bounding box", bbox)                
                 // console.log("boudning box2", bbox2)
-                const offsetX1 = offsetX
-                const offsetY1 = offsetX
-                console.log("scale", scale)
-                console.log("offsetX",offsetX/100)
-                console.log("offsetY", offsetY)
-                console.log("rect", rect)
-                console.log("scaleX", scaleX)
-                console.log("scaleY", scaleY)
-                const adjustedX1 = bbox[0] / offsetX1 / scaleX * scale;
-                const adjustedY1 = (bbox[1] - offsetY1) / scaleY * scale;
-                const adjustedX2 = (bbox[2] - offsetX1) / scaleX * scale;
-                const adjustedY2 = (bbox[3] - offsetY1) / scaleY * scale;
-
-                const originalX1 = adjustedX1 * (mat.cols / rect.width);
-                const originalY1 = adjustedY1 * (mat.rows / rect.height);
-                const originalX2 = adjustedX2 * (mat.cols / rect.width);
-                const originalY2 = adjustedY2 * (mat.rows / rect.height);
-                const roi = mat.roi(new cv.Rect(originalX1, originalY1, originalX2, originalY2))
-                cv.cvtColor(roi, roi, cv.COLOR_RGBA2BGR);
+                const offsetX1 = offsetX / 100
+                const offsetY1 = offsetX / 100
+                const width = mat.cols
+                const height = mat.rows
+                const scaleX2 = rect.width / width; // Horizontal scaling factor
+                const scaleY2 = rect.height/height; // Vertical scaling factor
+                console.log("up", `size: ${width}x${height}`,
+            "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4)+"%", "offsetY:",
+            offsetY.toFixed(4)+"%", "scale:", scale.toFixed(4), "rect:",rect, "bbox:", boundingBox.map(x=>x.toFixed(4)))
+                console.log("x",x,"y",y)
+                const scaledBox = bbox.map((x, i) => {
+                    const scale = (i % 2 === 0) ? scaleX : scaleY; // Determine scale based on index
+                    return x / scale; // Apply scaling
+                  });
+                console.log("scaledBox", scaledBox)
+                const x1 = scaledBox[0] / scaleX2
+                const y1 = scaledBox[1] / scaleY2
+                const x2 = scaledBox[2] / scaleX2
+                const y2 = scaledBox[3] /scaleY2
+                // const y2 = (offsetY / 100) * height - bbox[3]* offsetX/100
+                console.log(x1,y1,x2,y2)
+                const rectRoi = new cv.Rect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1))
+                console.log(rectRoi)
+                const roi = mat.roi(rectRoi)
+                cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
                 mat.delete()
-                downloadMatAsImage(roi,"plate.jpg",true).then(ok=> {
-                    console.log("saved")
-                })
-                URL.revokeObjectURL(image.src)
+                const plate = detectPlate(roi)
+                console.log("plate", plate)
+                // URL.revokeObjectURL(image.src)
             }
             
 
@@ -142,8 +154,12 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
         const y = (e.clientY - rect.top) * scaleY;
 
         if (isDragging) {
-            console.log("pressed", x, y, scaleX, scaleY, offsetX, offsetY, scale)
-            setBoundingBox([position[0], position[1], x, y])
+            // console.log("pressed", "x:",x.toFixed(4), "y:",y.toFixed(4), 
+            // "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4)+"%", "offsetY:",
+            // offsetY.toFixed(4)+"%", "scale:", scale.toFixed(4), "rw:",rect.width.toFixed(4), "rh:",rect.height.toFixed(4), "rl:", rect.left.toFixed(4), "rt:",rect.top.toFixed(4))
+            const box = [position[0], position[1], x, y]
+            console.log("box", box, "width", rect.width)
+            setBoundingBox(box)
         } else if (isPanning) {
             // console.log("not pressed", x, y)
             console.log("isPanning")
@@ -156,14 +172,16 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
             setOffsetX((prevOffsetX) => prevOffsetX + dx);
             setOffsetY((prevOffsetY) => prevOffsetY + dy);
 
-            setTransformOrigin({
-                x: `${offsetX}%`,
-                y: `${offsetY}%`,
-            });
-
             setPosition([x,y])
         }
     }
+
+    useEffect(()=> {
+        setTransformOrigin({
+            x: `${offsetX}%`,
+            y: `${offsetY}%`,
+        });
+    }, [offsetX,offsetY])
 
     const handleWheel = (e: WheelEvent) => {
         console.log("wheel")
@@ -250,7 +268,10 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
             // ctx.fillRect()
             // console.log("drawing",boundingBox[0], boundingBox[1], boundingBox[2]-boundingBox[0], boundingBox[3]-boundingBox[1])
             ctx.fillRect(boundingBox[0], boundingBox[1], boundingBox[2] - boundingBox[0], boundingBox[3] - boundingBox[1]); // Coordinates are transformed
-
+            ctx.beginPath()
+            ctx.arc(canvas.width/2,canvas.height/2,1, 0,360)
+            ctx.fill()
+            ctx.closePath()
             ctx.restore();
         };
 
@@ -286,7 +307,6 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes }) => {
                         width: "100%",
                         height: "auto",
                         display: "block", // Prevent inline-block issues
-                        transition: "transform 0.1s ease, transform-origin 0.1s ease",
                         cursor: cursor,
                     }}
                 />

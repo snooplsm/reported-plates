@@ -47,8 +47,7 @@ export const downloadAll = async (setLoading: unknown) => {
         ))
     })
     console.log("all")
-    downloading = Promise.all(promises).then(async result => {
-        console.log("downloaded")
+    downloading = Promise.all(promises).then(async result => {        
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
         plate = await InferenceSession.create(result[3]);
@@ -56,9 +55,11 @@ export const downloadAll = async (setLoading: unknown) => {
         ocr = await InferenceSession.create(result[5]);
         downloaded = true
         downloading = null
+        console.log("downloaded")
     }).catch(k => {
         console.log("error", k)
     })
+    return downloading
 }
 
 // const arrBufNet = await download(
@@ -202,7 +203,13 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     y * height_scale,
                     w * width_scale,
                     h * height_scale
-                ]            
+                ]       
+                if(scaled[0]+scaled[2]>src.cols) {
+                    scaled[2] = src.cols - scaled[0]
+                }     
+                if(scaled[1]+scaled[3]>src.rows) {
+                    scaled[3] = src.rows - scaled[1]
+                }
                 if (score >= .5 && w>60 && h>60) {
                     boxes.push({
                         file: file,
@@ -274,11 +281,11 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const link = document.createElement("a");
                 link.href = url;
                 link.download = "car.jpg";
-                // link.click()
+                link.click()
                 URL.revokeObjectURL(url)
                 const letter = letterbox(roi, [640,640])
                 roi.delete()
-                await downloadMatAsImage(letter.image)
+                // await downloadMatAsImage(letter.image)
                 const tensor = await matToOnnxTensor(letter.image)
                 // matC3.delete()
                 // matPad.delete()
@@ -475,16 +482,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         matC4.convertTo(matC4, cv.CV_32F, 1 / 255.0); // Normalize to [0, 1]       
                         cv.cvtColor(matC4, matC4, cv.COLOR_RGBA2RGB);
 
-                        let chwArray = new Float32Array(1 * 3 * 160 * 160);
-                        let channels = new cv.MatVector();
-                        cv.split(matC4, channels);
-
-                        for (let c = 0; c < 3; c++) {
-                            let channelData = channels.get(c).data32F;
-                            chwArray.set(channelData, c * 160 * 160);
-                        }
-
-                        const plateClassTensor = new Tensor("float32", chwArray, [1, 3, 160, 160]);
+                        const plateClassTensor = new Tensor("float32", matC4.data32F, [1, 3, 160, 160]);
                         const res = await plateClass.run({ images: plateClassTensor });
                         const outputTensor = res["output0"]
                         const data2 = outputTensor.data as Float32Array; // Access the raw data
@@ -559,6 +557,157 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
 
     })
 };
+
+export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
+    await downloadAll(()=>{})
+    const matC4 = matC3.clone()
+    const matPad = matC4.clone()
+    cv.cvtColor(matPad, matPad, cv.COLOR_RGBA2GRAY); // RGBA to BGR
+    // cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
+    cv.resize(matPad, matPad, new cv.Size(140, 70))
+
+    const input = new Uint8Array(matPad.data);
+    // matPad.delete()
+    const slots = 8
+    const tensorShape = [slots, 70, 140, 1];
+    const tensorData = new Uint8Array(slots * 70 * 140 * 1);
+
+    // Fill the tensorData with the image data (supports batch if needed)
+    for (let i = 0; i < input.length; i++) {
+        tensorData[i] = input[i];
+    }
+    const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    // Create the tensor
+    const tensor = new Tensor("uint8", tensorData, tensorShape);
+    const { concatenate } = await ocr.run({ input: tensor })
+    console.log("concat", concatenate.data)
+    // const totalElements = concatenate.data.length;
+    const alphabetLength = alphabet.length;
+    const batchSize = slots * alphabetLength;
+    const reshaped = concatenate
+    const data = reshaped.data; // Access the raw data as a Float32Array
+    const platesWithProbabilities = [];
+
+    for (let b = 0; b < batchSize; b++) {
+        const batchStart = b * slots * alphabetLength;
+        const batchIndices: number[] = [];
+        const slotProbabilities: number[] = [];
+
+        for (let s = 0; s < slots; s++) {
+            const slotStart = batchStart + s * alphabetLength;
+            // Ensure slotData is typed as number[]
+            const slotData: number[] = Array.from(data.slice(slotStart, slotStart + alphabetLength) as Float32Array);
+
+            // Use reduce to find the index of the maximum value
+            const maxIndex = slotData.reduce((maxIdx: number, value: number, idx: number) =>
+                value > slotData[maxIdx] ? idx : maxIdx, 0
+            );
+
+            // Get the probability of the max index
+            const maxValue = Math.max(...slotData);
+
+            batchIndices.push(maxIndex); // Store the character index
+            slotProbabilities.push(maxValue); // Store the slot's probability
+        }
+
+        // Step 3: Convert indices to characters
+        const plateChars = batchIndices.map(index => alphabet[index]);
+        const plate = plateChars.join("");
+        // Calculate overall plate probability (average)
+        const averageProbability = slotProbabilities.reduce((a, b) => a + b, 0) / slotProbabilities.length;
+
+        // Add to platesWithProbabilities array
+        platesWithProbabilities.push({
+            plate, // Plate string
+            probabilities: slotProbabilities, // Individual slot probabilities
+            averageProbability, // Average probability of the plate
+        });
+    }
+    // cv.cvtColor(src, matC4, cv.COLOR_RGBA2BGR); // RGBA to BGR
+    cv.cvtColor(matC4, matC4, cv.COLOR_BGR2RGB);
+    cv.resize(matC4, matC4, new cv.Size(160, 160), 0, 0, cv.INTER_LINEAR);
+    matC4.convertTo(matC4, cv.CV_32F, 1 / 255.0); // Normalize to [0, 1]       
+    
+
+    // let chwArray = new Float32Array(1 * 3 * 160 * 160);
+    // let channels = new cv.MatVector();
+    // cv.split(matC4, channels);
+
+    // for (let c = 0; c < 3; c++) {
+    //     let channelData = channels.get(c).data32F;
+    //     chwArray.set(channelData, c * 160 * 160);
+    // }
+
+    const plateClassTensor = new Tensor("float32", matC4.data32F, [1, 3, 160, 160]);
+    const res = await plateClass.run({ images: plateClassTensor });
+    const outputTensor = res["output0"]
+    const data2 = outputTensor.data as Float32Array; // Access the raw data
+    const batchSize2 = outputTensor.dims[0]; // Should be 1 for this case
+    // const outputLength = outputTensor.dims[1]; // Should be 7 for this case
+
+    if (batchSize2 !== 1) {
+        throw new Error("Batch size other than 1 is not supported");
+    }
+
+    // Assuming data is [x_center, y_center, width, height, class_prob_1, class_prob_2, ...]
+    const xCenter = data2[0];
+    const yCenter = data2[1];
+    const width = data2[2];
+    const height = data2[3];
+
+    // Class probabilities start from index 4
+    const classProbabilities = data2.slice(4);
+
+    // Get the most likely class index and probability
+    const maxProbIndex = classProbabilities.reduce(
+        (maxIdx, value, idx, array) => (value > array[maxIdx] ? idx : maxIdx),
+        0
+    );
+    const label = maxProbIndex + 4
+    const maxProbability = classProbabilities[maxProbIndex];
+
+    // Log the decoded results
+    // console.log("Bounding Box:");
+    // console.log(`  x_center: ${xCenter}, y_center: ${yCenter}`);
+    // console.log(`  width: ${width}, height: ${height}`);
+    // console.log(`Most likely class index: ${label}, ${yoloClassIndexToLabel[label]}`);
+    // console.log(`Probability of the class: ${maxProbability}`);
+    const plateProb = platesWithProbabilities[0] || null
+    const plate = {} as PlateDetection
+    plate.text = plateProb.plate.split("").filter(x=>x!=='_').join("")
+    plate.textWithUnderscores = plateProb.plate
+    plate.textAvgProb = plateProb.averageProbability
+    plate.textLetterProb = plateProb.probabilities
+    plate.state = yoloClassIndexToLabel[label].split("_")[0]
+    plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
+    plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
+    plate.stateConfidence = maxProbability
+
+    if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
+        plate.text = plate.text.replace(/I/g, '1');
+        plate.tlc = true
+        plate.state = "NY"
+    }
+    console.log(plate)
+    matC4.delete()
+    return plate
+}
+
+function detectPrimaryColor(image:Mat) {
+    let lower = [175, 118, 30, 0];
+    let higher = [255, 195, 25, 255];
+    let dst = new cv.Mat();
+    let low = new cv.Mat(image.rows, image.cols, image.type(), lower);
+    let high = new cv.Mat(image.rows, image.cols, image.type(), higher);
+    cv.inRange(image, low, high, dst);
+    const count = cv.countNonZero(dst)
+    if(count>30) {
+        return "Orange"
+    } else {
+        return "White"
+    }
+    dst.delete(); low.delete(); high.delete(); 
+}
 
 type BoundingBox = {
     x1: number;
@@ -642,7 +791,7 @@ function convertToDetectionResult(
     return results;
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 1): Promise<Blob> {
+export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 1): Promise<Blob> {
     return new Promise((resolve, reject) => {
         canvas.toBlob(blob => {
             if (blob) {
