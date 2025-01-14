@@ -208,7 +208,7 @@ function App() {
           flex={1}
           display="flex"
         >
-          <HowToGuide videoUrl='/video/howto1.mp4'/>
+          <HowToGuide videoUrl='video/howto1.mp4'/>
           {files && files[0] && <DetectView file={files[0]}/>}
         </Box>
       </Box>

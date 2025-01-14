@@ -33,12 +33,12 @@ export const complaints: Complaint[] = [
   {
     type: ComplaintType.BlockedBikeLane,
     media: MediaType.Image,
-    src: "/images/complaint/bikelane.svg"
+    src: `images/complaint/bikelane.svg`
   },
   {
     type: ComplaintType.BlockedCrosswalk,
     media: MediaType.Image,
-    src: "/images/complaint/crosswalk.svg"
+    src: "images/complaint/crosswalk.svg"
   },
   {
     type: ComplaintType.RanRedLight,
