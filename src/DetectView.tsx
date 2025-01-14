@@ -10,11 +10,17 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import cv from "@techstark/opencv-js";
 import heic2any from "heic2any";
+import { MapPickerView } from './MapPickerView';
+import { Feature, GeoSearchResponse } from './api/ny/nyc/nyc';
+import GeoSearchAutocomplete from './api/ny/nyc/GeoSearchAutocomplete';
 
 type DetectProps = {
     file: File; // The title displayed on the card
     boxes?: DetectBox[],
-    onPlate?: (plate:PlateDetection) => {}
+    onPlate?: (plate: PlateDetection) => void,
+    onLocationChange?: (resp: GeoSearchResponse, feature: Feature) => void
+    location?: GeoSearchResponse,
+    latLng?: Number[]
 };
 
 enum CanvasOption {
@@ -24,7 +30,7 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
-const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
+const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:DetectProps) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
@@ -38,11 +44,11 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
         y: "center",
     }); // Track zoom origin
 
-    const selectedOptionToCursor: Record<CanvasOption, [React.ReactElement,string]> = {
-        [CanvasOption.Pan]: [<PanToolIcon/>,"grab"],
-        [CanvasOption.Label]: [<HighlightAltIcon/>,"crosshair"],
-        [CanvasOption.ZoomIn]: [<ZoomInIcon/>,"zoom-in"],
-        [CanvasOption.ZoomOut]: [<ZoomOutIcon/>,"zoom-out"]
+    const selectedOptionToCursor: Record<CanvasOption, [React.ReactElement, string]> = {
+        [CanvasOption.Pan]: [<PanToolIcon />, "grab"],
+        [CanvasOption.Label]: [<HighlightAltIcon />, "crosshair"],
+        [CanvasOption.ZoomIn]: [<ZoomInIcon />, "zoom-in"],
+        [CanvasOption.ZoomOut]: [<ZoomOutIcon />, "zoom-out"]
     }
     const [selectedOption, setSelectedOption] = useState<CanvasOption | null>(CanvasOption.Pan);
     const [cursor, setCursor] = useState<string>("grab")
@@ -70,16 +76,16 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
     const onMouseDown = (e: React.MouseEvent) => {
         // console.log("onMouseDown")
         e.preventDefault()
-        if(selectedOption === CanvasOption.Label) {
+        if (selectedOption === CanvasOption.Label) {
             setIsDragging(true)
         }
-        if(selectedOption === CanvasOption.Pan) {
+        if (selectedOption === CanvasOption.Pan) {
             setIsPanning(true)
         }
         const rect = e.currentTarget.getBoundingClientRect();
         const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
         const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-        
+
         // Adjust coordinates for the canvas scale and offset
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
@@ -92,7 +98,7 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
     }, [position])
 
     const onMouseUp = (e: React.MouseEvent) => {
-        if(isDragging && boundingBox) {
+        if (isDragging && boundingBox) {
             const rect = canvasRef.current.getBoundingClientRect();
             const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
             const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
@@ -107,30 +113,30 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
             image.onload = async () => {
                 console.log(bbox)
                 const mat = cv.imread(image)
-                console.log("bounding box", bbox)                
+                console.log("bounding box", bbox)
                 // console.log("boudning box2", bbox2)
                 const offsetX1 = offsetX / 100
                 const offsetY1 = offsetX / 100
                 const width = mat.cols
                 const height = mat.rows
                 const scaleX2 = rect.width / width; // Horizontal scaling factor
-                const scaleY2 = rect.height/height; // Vertical scaling factor
+                const scaleY2 = rect.height / height; // Vertical scaling factor
                 console.log("up", `size: ${width}x${height}`,
-            "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4)+"%", "offsetY:",
-            offsetY.toFixed(4)+"%", "scale:", scale.toFixed(4), "rect:",rect, "bbox:", boundingBox.map(x=>x.toFixed(4)))
-                console.log("x",x,"y",y)
+                    "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4) + "%", "offsetY:",
+                    offsetY.toFixed(4) + "%", "scale:", scale.toFixed(4), "rect:", rect, "bbox:", boundingBox.map(x => x.toFixed(4)))
+                console.log("x", x, "y", y)
                 const scaledBox = bbox.map((x, i) => {
                     const scale = (i % 2 === 0) ? scaleX : scaleY; // Determine scale based on index
                     return x / scale; // Apply scaling
-                  });
+                });
                 console.log("scaledBox", scaledBox)
                 const x1 = scaledBox[0] / scaleX2
                 const y1 = scaledBox[1] / scaleY2
                 const x2 = scaledBox[2] / scaleX2
-                const y2 = scaledBox[3] /scaleY2
+                const y2 = scaledBox[3] / scaleY2
                 // const y2 = (offsetY / 100) * height - bbox[3]* offsetX/100
-                console.log(x1,y1,x2,y2)
-                const rectRoi = new cv.Rect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1))
+                console.log(x1, y1, x2, y2)
+                const rectRoi = new cv.Rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1))
                 console.log(rectRoi)
                 const roi = mat.roi(rectRoi)
                 cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
@@ -141,7 +147,7 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
                 roi.delete()
                 // URL.revokeObjectURL(image.src)
             }
-            
+
 
         }
         setIsDragging(false)
@@ -169,66 +175,70 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
             console.log("isPanning")
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
-            
+
             const dx = (position[0] - x) / scale;
             const dy = (position[1] - y) / scale;
-            console.log("panning at scale", scale, dx,dy)
+            console.log("panning at scale", scale, dx, dy)
             setOffsetX((prevOffsetX) => prevOffsetX + dx);
             setOffsetY((prevOffsetY) => prevOffsetY + dy);
 
-            setPosition([x,y])
+            setPosition([x, y])
         }
     }
 
-    useEffect(()=> {
+    useEffect(() => {
         setTransformOrigin({
             x: `${offsetX}%`,
             y: `${offsetY}%`,
         });
-    }, [offsetX,offsetY])
+    }, [offsetX, offsetY])
 
     const handleWheel = (e: WheelEvent) => {
         console.log("wheel")
-        e.preventDefault();    
+        e.preventDefault();
 
         const newScale = scale + e.deltaY * -0.004; // Adjust scale
         setScale(Math.min(Math.max(newScale, 1), 8)); // Clamp zoom level between 1x and 5x
     };
 
+    const onLocationSearch = (rep: GeoSearchResponse, value: Feature) => {
+        onLocationChange?.(rep, value)
+    }
+
     useEffect(() => {
         const fetchImage = async () => {
-          if (imageSrc) return; // Prevent redundant execution
-          let file2Use: string;
-    
-          if (file.type.toLowerCase() === "image/heic") {
-            const uuu = URL.createObjectURL(file);
-            try {
-              const blob: Blob = await (await fetch(uuu)).blob();
-              const converted = await heic2any({
-                blob,
-                toType: "image/jpeg",
-              });
-              file2Use = URL.createObjectURL(converted);
-            } catch (e) {
-              console.log(e);
-              return;
-            }
-          } else {
-            file2Use = URL.createObjectURL(file);
-          }
-          setImageSrc(file2Use);
-        };
-    
-        fetchImage();
-      }, [file]);
+            if (imageSrc) return; // Prevent redundant execution
+            let file2Use: string;
 
-      useEffect(() => {
+            if (file.type.toLowerCase() === "image/heic") {
+                const uuu = URL.createObjectURL(file);
+                try {
+                    const blob: Blob = await (await fetch(uuu)).blob();
+                    const converted = await heic2any({
+                        blob,
+                        toType: "image/jpeg",
+                    });
+                    file2Use = URL.createObjectURL(converted);
+                } catch (e) {
+                    console.log(e);
+                    return;
+                }
+            } else {
+                file2Use = URL.createObjectURL(file);
+            }
+            setImageSrc(file2Use);
+        };
+
+        fetchImage();
+    }, [file]);
+
+    useEffect(() => {
         const detect = boxes?.[0]?.plate || null;
         if (detect && plate !== detect) {
-          setPlate(detect);
+            setPlate(detect);
         }
-      }, [boxes, plate]);
-    
+    }, [boxes, plate]);
+
 
     useEffect(() => {
         const container = boxRef.current;
@@ -273,7 +283,7 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
             // console.log("drawing",boundingBox[0], boundingBox[1], boundingBox[2]-boundingBox[0], boundingBox[3]-boundingBox[1])
             ctx.fillRect(boundingBox[0], boundingBox[1], boundingBox[2] - boundingBox[0], boundingBox[3] - boundingBox[1]); // Coordinates are transformed
             ctx.beginPath()
-            ctx.arc(canvas.width/2,canvas.height/2,1, 0,360)
+            ctx.arc(canvas.width / 2, canvas.height / 2, 1, 0, 360)
             ctx.fill()
             ctx.closePath()
             ctx.restore();
@@ -286,77 +296,76 @@ const DetectView: React.FC<DetectProps> = ({ file, boxes, onPlate }) => {
     if (imageSrc == null) {
         return null
     } else
-        return (<Box>
-            <Box
-                ref={boxRef}
-                sx={{
-                    position: "relative",
-                    overflow: "hidden",
-                    maxWidth: "608px",
-                    width: "100%",
-                    height: "auto", // Maintain aspect ratio                
-                }}
-                onMouseDown={onMouseDown}
-                onMouseUp={onMouseUp}
-                onMouseLeave={onMouseUp}
-                onMouseMove={onMouseMove}
-            >
+        return (
+            <Box>
+                <Box
+                    ref={boxRef}
+                    sx={{
+                        position: "relative",
+                        overflow: "hidden",
+                        maxWidth: "400px",
+                        width: "auto",
+                        height: "auto", // Maintain aspect ratio                
+                    }}
+                    onMouseDown={onMouseDown}
+                    onMouseUp={onMouseUp}
+                    onMouseLeave={onMouseUp}
+                    onMouseMove={onMouseMove}
+                >
 
-                <img
-                    ref={imgRef}
-                    src={imageSrc}
-                    style={{
-                        transform: `scale(${scale})`,
-                        transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
-                        width: "100%",
-                        height: "auto",
-                        display: "block", // Prevent inline-block issues
-                        cursor: cursor,
+                    <img
+                        ref={imgRef}
+                        src={imageSrc}
+                        style={{
+                            transform: `scale(${scale})`,
+                            transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
+                            width: "100%",
+                            height: "auto",
+                            display: "block", // Prevent inline-block issues
+                            cursor: cursor,
+                        }}
+                    />
+                    <canvas
+                        ref={canvasRef}
+                        style={{
+                            position: "absolute", // Overlay canvas on top of the image
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            height: "100%",
+                            display: "block", // Ensures the canvas behaves like an inline element
+                            cursor: cursor,
+                            pointerEvents: "auto"
+                        }}
+                    />
+                </Box>
+                <ToggleButtonGroup
+                    value={selectedOption}
+                    exclusive
+                    onChange={handleToggle}
+                    aria-label="Pan or Label"
+                    sx={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        margin: "1rem",
                     }}
-                />
-                <canvas
-                    ref={canvasRef}
-                    style={{
-                        position: "absolute", // Overlay canvas on top of the image
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
-                        display: "block", // Ensures the canvas behaves like an inline element
-                        cursor: cursor,
-                        pointerEvents: "auto"
-                    }}
-                />
+                >
+                    <ToggleButton value={CanvasOption.Pan} aria-label="Pan">
+                        {selectedOptionToCursor[CanvasOption.Pan]}
+                    </ToggleButton>
+                    <ToggleButton value={CanvasOption.Label} aria-label="Label">
+                        {selectedOptionToCursor[CanvasOption.Label]}
+                    </ToggleButton>
+                    <ToggleButton value={CanvasOption.ZoomIn} aria-label="ZoomIn">
+                        {selectedOptionToCursor[CanvasOption.ZoomIn]}
+                    </ToggleButton>
+                    <ToggleButton value={CanvasOption.ZoomOut} aria-label="ZoomOut">
+                        {selectedOptionToCursor[CanvasOption.ZoomOut]}
+                    </ToggleButton>
+                </ToggleButtonGroup>                
+                {/* <GeoSearchAutocomplete initial={location} onChange={onLocationSearch} /> */}
+                {/* <MapPickerView latLng={latLng} location={location} /> */}
             </Box>
-            <ToggleButtonGroup
-                value={selectedOption}
-                exclusive
-                onChange={handleToggle}
-                aria-label="Pan or Label"
-                sx={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    margin: "1rem",
-                }}
-            >
-                <ToggleButton value={CanvasOption.Pan} aria-label="Pan">
-                    {selectedOptionToCursor[CanvasOption.Pan]}
-                </ToggleButton>
-                <ToggleButton value={CanvasOption.Label} aria-label="Label">
-                    {selectedOptionToCursor[CanvasOption.Label]}
-                </ToggleButton>
-                <ToggleButton value={CanvasOption.ZoomIn} aria-label="ZoomIn">
-                {selectedOptionToCursor[CanvasOption.ZoomIn]}
-                </ToggleButton>
-                <ToggleButton value={CanvasOption.ZoomOut} aria-label="ZoomOut">
-                {selectedOptionToCursor[CanvasOption.ZoomOut]}
-                </ToggleButton>
-            </ToggleButtonGroup>
-            {plate && <LicensePlate plate={plate} />}
-            {plate && plate.image && <LicensePlateImage image={plate.image} />}
-            {plateOverride && <LicensePlate plate={plateOverride} />}            
-            {plateOverride && plateOverride.image && <LicensePlateImage image={plateOverride.image} />}
-        </Box>
         )
 }
 

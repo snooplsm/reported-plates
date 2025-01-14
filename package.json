@@ -21,12 +21,17 @@
     "exif-js": "^2.3.0",
     "exifreader": "^4.25.0",
     "heic2any": "^0.0.4",
+    "leaflet": "^1.9.4",
+    "lottie-react": "^2.4.0",
     "onnxruntime-web": "^1.20.1",
     "piexifjs": "^1.0.6",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-easy-panzoom": "^0.4.4",
-    "react-inner-image-zoom": "^3.0.2"
+    "react-inner-image-zoom": "^3.0.2",
+    "react-leaflet": "^5.0.0-rc.2",
+    "react-lottie": "^1.2.10",
+    "react-lottie-player": "^2.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

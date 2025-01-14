@@ -3,6 +3,7 @@ import { download } from "../utils/download";
 import cv, { Mat } from "@techstark/opencv-js";
 import { yoloClassIndexToLabel, yoloSegClasses, yoloSegIndexToLabel, yoloSegVehicles } from "../labels";
 import heic2any from "heic2any";
+import { State } from "../States";
 
 const models = [
     ['segment', 'yolov8n-seg'],
@@ -281,7 +282,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const link = document.createElement("a");
                 link.href = url;
                 link.download = "car.jpg";
-                link.click()
+                // link.click()
                 URL.revokeObjectURL(url)
                 const letter = letterbox(roi, [640,640])
                 roi.delete()
@@ -534,8 +535,11 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                                 plate.text = plate.text.replace(/L/g, '1');
                                 plate.text = plate.text.replace(/Z/g, '2');
                                 plate.text = plate.text.replace(/G/g, '6');
-                                plate.text = plate.text.replace(/B/g, '2');
+                                plate.text = plate.text.replace(/B/g, '8');
                                 plate.text = plate.text.replace(/A/g, '4');
+                                plate.text = plate.text.replace(/O/g, '0');
+                                plate.state = State.NY
+                                plate.tlc = true
                             }
                         }
                     }
@@ -562,6 +566,21 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
 
     })
 };
+
+export function refinePlateForTLC(plateText:string): [string, boolean] {
+    let tlc = false
+    if (plateText?.startsWith('T') && plateText.endsWith('C') && plateText.length==7) {
+        plateText = plateText.replace(/I/g, '1');
+        plateText = plateText.replace(/L/g, '1');
+        plateText = plateText.replace(/Z/g, '2');
+        plateText = plateText.replace(/G/g, '6');
+        plateText = plateText.replace(/B/g, '8');
+        plateText = plateText.replace(/A/g, '4');
+        plateText = plateText.replace(/O/g, '0');
+        tlc = true
+    }
+    return [plateText, tlc]
+}
 
 export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     await downloadAll(()=>{})
@@ -690,8 +709,14 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     plate.image = await matToBlob(matC3)
     if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
         plate.text = plate.text.replace(/I/g, '1');
+        plate.text = plate.text.replace(/L/g, '1');
+        plate.text = plate.text.replace(/Z/g, '2');
+        plate.text = plate.text.replace(/G/g, '6');
+        plate.text = plate.text.replace(/B/g, '8');
+        plate.text = plate.text.replace(/A/g, '4');
+        plate.text = plate.text.replace(/O/g, '0');
         plate.tlc = true
-        plate.state = "NY"
+        plate.state = State.NY
     }
     console.log(plate)
     matC4.delete()
@@ -1062,7 +1087,7 @@ export interface PlateDetection {
     box: [x: number, y: number, w: number, h: number],
     probability: number,
     image?: Blob
-    state?: string
+    state?: State
     stateConfidence?:number
     text?: string
     textWithUnderscores?: string

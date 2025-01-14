@@ -1,105 +1,59 @@
-import React, { useEffect, useState } from "react";
-import { Box, Typography } from "@mui/material";
-import { PlateDetection } from "./api/segment";
+import React, { useEffect, useRef, useState } from "react";
+import { Box, FormControl, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { PlateDetection, refinePlateForTLC } from "./api/segment";
+import { NYSTATE, State, StatePres, states } from "./States";
 
 type LicensePlateProps = {
-  plate: PlateDetection; // The text on the license plate
+  plate?: PlateDetection; // The text on the license plate
 };
 
 const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
 
-  const [color, setColor] = useState("#000")
-  const [bgColor, setBgColor] = useState("#FFF")
-  const [topText, setTopText] = useState("")
+  const [color, setColor] = useState(NYSTATE.plate.color)
+  const [bgColor, setBgColor] = useState(NYSTATE.plate.bg)
   const [bottomText, setBottomText] = useState("")
-  const [topTextColor, setTopTextColor] = useState("#FFF")
-  const [bottomTextColor, setBottomTextColor] = useState("#FFF")
-  const [bottomBgColor, setBottomBgColor] = useState("")
-  const [topBgColor, setTopBgColor] = useState("")
-  const [fontSize,setFontSize] = useState("")
+  const [bottomTextColor, setBottomTextColor] = useState(NYSTATE.bottom.color)
+  const [bottomBgColor, setBottomBgColor] = useState(NYSTATE.bottom.bg)
+  const [fontSize, setFontSize] = useState("")
+  const [plateText, setPlateText] = useState("")
 
-  type State = "NY" | "PA" | "NJ" | "CT";
+  const stateRef = useRef<HTMLSelectElement>(null)
 
-  const stateColorsText: Record<State, string> = {
-    NY: "#0B0C14",
-    PA: "#0E1756",
-    NJ: "#000",
-    CT: "#0A142E",
-  };
+  const [plateState, setPlateState] = useState(NYSTATE)
 
-  const stateColorsBG: Record<State, string> = {
-    NJ: "linear-gradient(to bottom, #FFF44F, #FFFFFF)",
-    NY: "#FFF",
-    CT: "linear-gradient(to bottom, #ADD8E6, #FFFFFF)",
-    PA: "#FFF",
-  };
-
-  const stateBottomText: Record<State, (isTlc: boolean) => string> = {
-    NY: (isTlc) => (isTlc ? "TL&C" : "EXCELSIOR"),
-    PA: () => "visitPA.com",
-    NJ: () => "Garden State",
-    CT: () => "Constitution State",
-  };
-
-  const stateTopText: Record<State, string> = {
-    NY: "NEW YORK",
-    PA: "PENNSYLVANIA",
-    NJ: "NEW JERSEY",
-    CT: "CONNECTICUT",
-  };
-
-  const stateBottomTextColor: Record<State, string> = {
-    NY: "#ED9C36",
-    PA: "#000",
-    NJ: "#000",
-    CT: "",
-  };
-
-  const stateTopBgColor: Record<State, string> = {
-    NY: "#00000000",
-    PA: "#0E1756",
-    NJ: "#00000000",
-    CT: "#00000000",
-  };
-
-  const stateBottomBgColor: Record<State, string> = {
-    NY: "#00000000",
-    PA: "#F0CA38",
-    NJ: "#00000000",
-    CT: "#00000000",
-  };
+  useEffect(() => {
+    setPlateText(plate?.text || "NONE")
+  }, [plate]);
 
   useEffect(() => {
     let fontSize = "3.9rem";
-    if (plate.text && plate.text.length > 6) {
+    if (plateText.length > 6) {
       fontSize = "3.5rem";
     }
-    const state = plate.state as State
-    const font = stateColorsText[state] || "#000";
-    const bg = stateColorsBG[state] || "#FFF";
-    const topText = stateTopText[state] || "";
-    const topTextColor = stateColorsText[state] || "";
-    const topBgColor = stateTopBgColor[state] || "";
-    const bottomBgColor = stateBottomBgColor[state] || "";
-    const bottomTextColor = stateBottomTextColor[state] || "";
-    setTopTextColor(topTextColor);
+    const font = plateState.plate.color || "#000";
+    const bg = plateState.plate.bg || "#FFF"
+    const bottomBgColor = plateState.bottom.bg || "";
+    const bottomTextColor = plateState.bottom.color || "";
     setBottomTextColor(bottomTextColor);
     setBottomBgColor(bottomBgColor);
-    setTopBgColor(topBgColor);
-    const bottomText = stateBottomText[state](plate.tlc||false);
+    let bottomText = plateState.bottom.text
+    if (typeof bottomText != 'string') {
+      const [licensePlate,tlc] = refinePlateForTLC(plateText)
+      const func = bottomText as (tlc: boolean) => string
+      bottomText = func(tlc || plate?.tlc || false)
+    }
     setColor(font);
     setBgColor(bg);
-    setTopText(topText);
     setBottomText(bottomText);
     setFontSize(fontSize)
-  }, [plate]);
+  }, [plateState, plateText])
 
   return (
     <Box
       sx={{
         width: "20rem", // Use rem instead of px for width
         height: "10rem", // Use rem instead of px for height
-        backgroundColor: bgColor,
+        background: plateState.plate.bg,
         borderRadius: "1rem", // Rounded corners
         border: "0.2rem solid #000000", // Border thickness
         display: "flex",
@@ -114,7 +68,8 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
         letterSpacing: "10rem",
         overflow: "hidden"
       }}
-    >    <Box
+    >    
+    <Box
       sx={{
         position: 'absolute',
         height: "100%",
@@ -125,38 +80,192 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
         justifyContent: "center",
       }}
     >
-        <Typography
+        <TextField
+          
+          variant="standard" // Remove outlined or filled styling
+          InputProps={{
+            disableUnderline: true, // Disable underline
+            sx: {
+              fontSize: fontSize,
+              fontWeight: 600,  // Remove padding
+              textAlign: "center",
+              width: "100%",              
+            }
+            
+          }}
+          inputProps={{
+            maxLength: 9
+          }}
           sx={{
             fontSize: fontSize,
             fontWeight: 600,
-            color: "#0E1756", // Default text color
+            "& .MuiInputBase-input": {
+              textAlign: "center", // Center-align input text
+            },
+            "& .MuiInput-root": {
+              border: "none", // No border
+              justifyContent: "center", // Ensure alignment
+            },
           }}
-        >
-          {plate.text}
-        </Typography>
+          onChange={(text) => {
+            const [refined,tlc] = refinePlateForTLC(text.currentTarget.value)
+            setPlateText(refined)
+          }}
+          value={plateText}
+        />
       </Box>
+      {plateState.state==State.NY && <>
       <Box
         sx={{
           position: 'absolute',
-          top: 0,
+          top: ".8rem",
+          width: "25%",
+          zIndex: 3,
+          height: ".15rem", // Adjust thickness
+          background: NYSTATE.plate.color
+        }}>
+        
+        </Box>
+        <Box
+        sx={{
+          position: 'absolute',
+          top: "1.3rem",
+          width: "25%",
+          zIndex: 3,
+          height: ".3rem", // Adjust thickness
+          background: NYSTATE.bottom.color
+        }}>
+        
+        </Box>
+        <Box
+        sx={{
+          position: 'absolute',
+          top: ".8rem",
+          right: 0,
+          width: "25%",
+          zIndex: 3,
+          height: ".15rem", // Adjust thickness
+          background: NYSTATE.plate.color
+        }}>
+        
+        </Box>
+        <Box
+        sx={{
+          position: 'absolute',
+          right: 0,
+          top: "1.3rem",
+          width: "25%",
+          zIndex: 3,
+          height: ".3rem", // Adjust thickness
+          background: NYSTATE.bottom.color
+        }}></Box>
+        </>}
+        
+      <Box
+        sx={{
+          position: 'absolute',
+          top: "-.5rem",
           width: "100%",
-          zIndex: 0,
+          zIndex: 2,
           alignItems: "center",
           justifyContent: "center",
-          height: "1.8rem", // Adjust thickness
-          backgroundColor: topBgColor, // Blue color
+          height: "3.3rem", // Adjust thickness
+          background: plateState.top.bg, // Blue color
         }}
-      ><Typography
-        sx={{
-          fontSize: "1.5rem",
-          top: "0", // 
-          left: "20%", // Center horizontally
-          fontWeight: 600,
-          color: topTextColor, // Default text color
-        }}
-      >
-          {topText}
-        </Typography></Box>
+      ><FormControl>
+          <Select
+            labelId="dropdown-label"
+            value={plateState}
+            ref={stateRef}
+            onOpen={(k) => {
+              const cur = stateRef.current
+              if (!cur) {
+                return
+              }
+              const value = plateState
+              setTimeout(() => {
+                const currentMenuItem = document.querySelector(
+                  `.MuiMenuItem-root[data-value="${value}"]`
+                );
+
+                if (currentMenuItem) {
+                  let targetMenuItem = currentMenuItem;
+                  let offset = 4
+                  let steps = offset;
+
+                  // Traverse `previousElementSibling` `offset` times
+                  while (steps > 0 && targetMenuItem.previousElementSibling) {
+                    targetMenuItem = targetMenuItem.previousElementSibling;
+                    steps--;
+                  }
+
+                  // Check if the final target is a MenuItem
+                  if (targetMenuItem && targetMenuItem.classList.contains("MuiMenuItem-root")) {
+                    console.log(`Scrolling to the MenuItem ${offset} steps before:`, targetMenuItem);
+                    targetMenuItem.scrollIntoView(true);
+                  } else {
+                    console.log(`No MenuItem found ${offset} steps before`);
+                    currentMenuItem.scrollIntoView(true)
+                  }
+                } else {
+                  console.log("MenuItem not found for value:", value);
+                }
+              }, 0)
+
+            }}
+            onChange={(k) => {
+              const value = k.target.value as StatePres
+              console.log(value.plate.bg)
+              setPlateState(value)
+            }
+            }
+            disableUnderline
+            sx={{
+              fontSize: "1.5rem",
+              fontWeight: 600,
+              textAlign: "center",
+              background: "none",
+              border: "none",
+              boxShadow: "none",
+              color: plateState.top.color,
+              outline: "none",
+              "& fieldset": {
+                border: "none", // Ensures the outlined border is removed
+              },
+              "&:hover": {
+                border: "none", // Removes border on hover
+              },
+              cursor: "pointer", // Ensure pointer cursor for usability
+              "& .MuiSelect-icon": {
+                color: plateState.top.color, // Arrow color
+              },
+              "&:focus": {
+                outline: "none", // Remove focus outline
+              },
+              "& .Mui-selected": {
+                color: plateState.top.color, // Adjust the selected text color
+              },
+            }}
+            MenuProps={{
+              PaperProps: {
+                style: {
+                  maxHeight: "400px", // Limit the height of the dropdown
+                  overflowY: "auto", // Make it scrollable
+                },
+              }
+            }
+            }
+          >
+            {states.map((state, index) => <MenuItem key={`${state.state}_${index}`} value={state}><Typography
+              sx={{
+                fontSize: "1.5rem",
+                fontWeight: 600,
+              }}
+            >
+              {state.top.text as string}
+            </Typography></MenuItem>)}
+          </Select>
+        </FormControl></Box>
 
       {/* Bottom Yellow Line */}
       <Box
@@ -182,7 +291,7 @@ const LicensePlate: React.FC<LicensePlateProps> = ({ plate }) => {
           {bottomText}
         </Typography></Box>
 
-    </Box>
+    </Box >
   );
 };
 

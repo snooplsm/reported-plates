@@ -1,0 +1,258 @@
+<div
+      >
+        <Box
+          sx={{
+            display: "flex",
+            width: "100%",
+            gap: 2, // Space between the image and the text
+          }}
+        >
+
+          <Box
+            component="img"
+            src={logo}
+            sx={{
+              width: 40, // Set width for the image
+              height: 40, // Set height for the image
+              objectFit: "contain", // Ensure the image is fully visible
+            }}
+          />      <Typography variant="h1" sx={{ fontSize: "2rem", fontWeight: "bold" }}>
+            Reported
+          </Typography>
+        </Box>
+        <Box onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          component="section"
+          sx={{
+            transition: "background-color 0.2s ease",
+            cursor: "pointer",
+            backgroundColor: isDragging ? "primary.light" : "background.default",
+            p: 1, border: '1px dashed grey', padding: '1em'
+          }}>
+          <Box>Drag and Drop photos here or <u><a onClick={() => {
+            fileInputRef.current?.click()
+          }} href="#">Choose here</a></u>.  You can also drop directly onto the complaint below.
+            <input ref={fileInputRef} hidden accept=".jpg, .png, .heif, .heic" type="file" onChange={handleFileChange} />
+          </Box>
+          <Box sx={{ padding: '.2em' }}></Box>
+          <Box sx={{ textAlign: 'left', paddingLeft: '.4em', paddingBottom: '.2em' }}>
+            <Typography sx={{ fontWeight: "500" }}>Supported Formats</Typography></Box>
+
+
+          <Box sx={{ p: 2, padding: '.2em', border: '1px dashed grey', borderRadius: "16px 0 16px 0", textAlign: 'left' }}>
+
+            <Box>
+              <Box sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}><Icon sx={{ paddingBottom: '2.1rem',color: theme.palette.gunmetal.main }}  aria-label="gallery">
+                  <PhotoAlbumIcon sx={{ fontSize: 16 }} />
+                </Icon>
+                <Typography sx={{
+                  fontSize: '.875rem',
+                  fontWeight: 500,
+                  color: theme.palette.gunmetal.main,
+                  lineHeight: "1.25rem"
+                }}>
+                  Images
+                </Typography>
+              </Box>
+              <Box>
+                <Typography
+                  sx={{
+                    gap: ".5rem",
+                    fontSize: '.75rem',
+                    fontWeight: 400,
+                    lineHeight: "1rem",
+                    color: theme.palette.gray.main,
+                    font: "SF Mono, monospace"
+                  }}>.jpg, .heic</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box><br />
+        <Box sx={{ width: '100%', mx: 'auto', mt: 1 }}>
+  <ToggleButtonGroup
+    value={selected}
+    exclusive
+    onChange={handleSelection}    
+    aria-label="media toggle buttons"
+    sx={{
+      display: 'flex',
+      justifyContent: 'space-between', // Adjust spacing between buttons
+      gap: 1, // Add space between buttons
+    }}
+  >
+    <ToggleButton
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      sx={{
+        flex: 1, // Ensures all buttons take equal width
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 200, // Consistent height
+        textAlign: 'center',
+        overflow: 'hidden', // Ensures cropped overflow
+      }}
+      value="blockedbikelane"
+      aria-label="Blocked Bike Lane"
+    >
+      {/* <Box
+        component="img"
+        src="/images/complaint/blockedbikelane.jpeg"
+        alt="Blocked Bike Lane"
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover', // Ensures no distortion
+        }}
+      /> */}
+      <span>Blocked Bike Lane</span>
+    </ToggleButton>
+
+    <ToggleButton
+    onDragOver={handleDragOver}
+    onDragLeave={handleDragLeave}
+    onDrop={handleDrop}
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 200,
+        textAlign: 'center',
+        overflow: 'hidden',
+      }}
+      value="blockedcrosswalk"
+      aria-label="Blocked Crosswalk"
+    >
+      {/* <Box
+        component="img"
+        src="/images/complaint/blockedcrosswalk.jpg"
+        alt="Blocked Crosswalk"
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      /> */}
+      <span>Blocked Crosswalk</span>
+    </ToggleButton>
+
+    <ToggleButton
+    onDragOver={handleDragOver}
+    onDragLeave={handleDragLeave}
+    onDrop={handleDrop}
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 200,
+        textAlign: 'center',
+        overflow: 'hidden',
+      }}
+      value="ranredlight"
+      aria-label="Ran Red Light"
+    >
+      {/* <Box
+        component="img"
+        src="/images/complaint/ranredlight.jpg"
+        alt="Ran Red Light"
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      /> */}
+      <span>Ran Red Light</span>
+    </ToggleButton>
+
+    <ToggleButton
+    onDragOver={handleDragOver}
+    onDragLeave={handleDragLeave}
+    onDrop={handleDrop}
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 200,
+        textAlign: 'center',
+        overflow: 'hidden',
+      }}
+      value="parkedillegally"
+      aria-label="Parked Illegally"
+    >
+      {/* <Box
+        component="img"
+        src="/images/complaint/parkedillegally.jpg"
+        alt="Parked Illegally"
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      /> */}
+      <span>Parked Illegally</span>
+    </ToggleButton>
+
+    <ToggleButton
+    onDragOver={handleDragOver}
+    onDragLeave={handleDragLeave}
+    onDrop={handleDrop}
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 200,
+        textAlign: 'center',
+        overflow: 'hidden',
+      }}
+      value="droverecklessly"
+      aria-label="Drove Recklessly"
+    >
+      {/* <Box
+        component="video"
+        src="/images/complaint/droverecklessly.mp4"
+        autoPlay
+        loop
+        muted
+        sx={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      /> */}
+      <span>Drove Recklessly</span>
+    </ToggleButton>
+  </ToggleButtonGroup>
+
+  {selected && (
+    <Box mt={2}>
+      <strong>Selected:</strong> {selected}
+    </Box>
+  )}
+</Box>
+        {files && files[0] && 
+        <><DetectView 
+          key={files[0].name} 
+          file={files[0]} 
+          boxes={boxes} 
+          location={location}
+          latLng={latLng}
+          onLocationChange={onLocationChange}
+          onPlate={onPlate}/><br/></>}
+        {/* {dateOfIncident?.toString()}<br/> */}
+        {/* {location?.features[0].properties.label} */}
+      </div>
