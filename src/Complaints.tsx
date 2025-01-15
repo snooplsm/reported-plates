@@ -6,6 +6,8 @@ import ranRedLight from "./lottie/ranredlight.json"
 import reckless from "./lottie/reckless.json"
 import noParking from "./lottie/parkedillegally.json"
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { Steps } from "./HowToGuide";
+import TextFit from "react-textfit"
 
 export interface Complaint {
   type: ComplaintType;
@@ -89,7 +91,7 @@ export interface ComplaintProps {
 }
 
 const handleDrop = (onFiles: (complaint: Complaint, files: File[]) => void, complaint: Complaint, e: React.DragEvent<HTMLDivElement>) => {
-  console.log("handle drop")
+  // console.log("handle drop")
   e.preventDefault();
 
   // e.stopPropagation();
@@ -123,10 +125,12 @@ export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex
 }
 
 interface ComplaintsProps {
-  onFiles: (complaint: Complaint, file: File[]) => void
+  onFiles: (complaint: Complaint, file: File[]) => void,
+  step?: Steps,
+  hoveredStep?: Steps | undefined
 }
 
-export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
+export const ComplaintsView = ({ onFiles, step, hoveredStep }: ComplaintsProps) => {
 
   const [hoveredIndex, setHoveredIndex] = useState<number | undefined>()
 
@@ -145,18 +149,18 @@ export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
   const [display, setDisplay] = useState<string | undefined>("hidden")
 
   useEffect(() => {
-    console.log("hoverIndex", hoveredIndex)
+    // console.log("hoverIndex", hoveredIndex)
     if (selectedIndex != undefined) {
       setDisplay("inline")
       setTooltip(complaints[selectedIndex].type)
     } else {
       if (hoveredIndex != undefined) {
-        console.log("not undefined")
+        // console.log("not undefined")
         setDisplay("inline")
-        console.log(complaints[hoveredIndex!].type)
+        // console.log(complaints[hoveredIndex!].type)
         setTooltip(complaints[hoveredIndex!].type)
       } else {
-        console.log("undefined")
+        // console.log("undefined")
         if (selectedIndex != undefined) {
           setDisplay("inline")
         } else {
@@ -183,7 +187,7 @@ export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
             flexWrap: 'wrap', // Allows items to wrap to the next row
           }}
         >
-          {complaints.slice(0, 4).map((item, index) => {
+          {complaints.map((item, index) => {
             let filter = undefined
             if (selectedIndex == index) {
               filter = undefined
@@ -192,14 +196,13 @@ export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
             }
             return (
               <Paper
-
                 elevation={3}
                 key={item.type + "_" + index}
                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                   e.preventDefault()
                 }}
                 onDragEnter={(e: DragEvent) => {
-                  console.log("drag enter")
+                  // console.log("drag enter")
                   setHoveredIndex(index)
                   e.preventDefault()
                 }}
@@ -213,7 +216,7 @@ export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
                   handleSelect(index)
                 }}
                 onMouseLeave={(e) => {
-                  console.log("mouse leave")
+                  // console.log("mouse leave")
                   setHoveredIndex(undefined)
                   e.preventDefault()
                 }}
@@ -223,93 +226,57 @@ export const ComplaintsView = ({ onFiles }: ComplaintsProps) => {
                 }}
                 sx={{
                   overflow: 'hidden',
-                  flex: '0 0 calc(48%)', // 50% width
-                  width: '48%',
+                  flex: '0 0 calc(31%)', // 50% width
+                  width: '31%',
                   borderRadius: 4,
                   marginBottom: "2%",
-                  filter: filter,
+                  filter: undefined,
                 }}
               ><ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} /></Paper>
             )
           })}
-        </Box>
-        <Box position="relative" sx={{ width: '100%' }}>
-          {/* First 4 Items */}
-          <Box
+          <Paper
+            elevation={3}
             sx={{
-              top: 0,
-              left: 0,
-              width: '100%',
-              gap: "2%",
-              margin: .5,
-              display: 'flex',
-              flexWrap: 'wrap', // Allows items to wrap to the next row
+              width: "31%",
+              backgroundColor: "yellow",
+              borderRadius: 4,
+              marginBottom: "2%",
+              overflow: "hidden",
+              display: "flex",
+              flex: `0 0 calc("31%"})`, // 50% width
+              flexDirection: "column"
             }}
           >
-            <Paper
-              elevation={3}
-              sx={{
-                width: "48%",
-                backgroundColor: "yellow",
-                padding: "8px",
-                borderRadius: 4, overflow: "hidden",
-                display: "flex",
-                flex: `0 0 calc("48%"})`, // 50% width
-              }}
-            ><CloudUploadIcon sx={{
+            <Box sx={{
               position: "absolute",
-              top: -1,
+              paddingLeft: "2%",
+              paddingTop: "1%"            
+            }}>
+            <CloudUploadIcon sx={{              
+              width: "22%",
+              height: "22%",
+              justifyContent: "top",
+              position: "relative", // Centers icon horizontally in its flex container
+              top: 0,
+              left: 0,
             }} />
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center', // Centers text vertically
-                  justifyContent: 'center', // Centers text horizontally
-                }}
-              >
-                <Typography sx={{
-                  margin: .5,
-                  fontSize: ".8rem",
-                }}>upload or drag & drop jpeg, heic</Typography></Box></Paper>
-            {complaints.map((complaint, index) => {
-              if (index != complaints.length - 1) {
-                return <></>
-              }
-              return <Paper
-                elevation={3}
-                key={complaint.type + "_index"}
-                onDragEnter={(e) => {
-                  console.log("drag enter")
-                  setHoveredIndex(index)
-                  e.preventDefault()
-                }}
-                onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
-                  e.preventDefault()
-                }}
-                onMouseEnter={(e) => {
-                  setHoveredIndex(index)
-                }}
-                onMouseLeave={(e) => {
-                  console.log("mouse leave")
-                  setHoveredIndex(undefined)
-                }}
-                onDrop={(e: React.DragEvent<HTMLDivElement>) => {
-                  handleDrop(onFiles, complaint, e)
-                }}
-                onClick={() => {
-                  handleSelect(index)
-                }}
-                sx={{
-                  top: 0,
-                  flex: `0 0 calc("48%"})`, // 50% width
-                  borderRadius: 4,
-                  width: "48%",
-                  filter: (hoveredIndex != undefined && index != hoveredIndex) && (selectedIndex != undefined && selectedIndex != index) ? "grayscale(100%)" : undefined
-                }}
-              ><LottiePlayer forcePlay={index == hoveredIndex} width={"100%"} complaint={complaint} />
-              </Paper>
-            })}
-          </Box>
+            </Box>
+            <Box
+              sx={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                fontSize: ".5rem",
+                alignItems: "center", // Centers text vertically
+                justifyContent: "center", // Centers text horizontally
+                textAlign: "center",
+                textWrap: "wrap",
+              }}
+            >
+              upload <br/>or<br/>drag & drop<br/>jpeg, heic
+            </Box>
+          </Paper>
         </Box>
       </Box>
       <Typography sx={{ top: 0, fontSize: ".75rem", paddingLeft: ".2rem", paddingRight: ".2rem" }}>Left-to-Right and Top-to-Bottom: <u>Blocked bike lane</u>, <u>crosswalk</u>, <u>ran red light</u>, <u>drove recklessly</u>, <u>illegal parking</u>.</Typography>
@@ -352,12 +319,12 @@ export const LottiePlayer = ({ complaint, width, forcePlay }: ComplaintProps) =>
 
     }
     sx={{
-      flex: `0 0 calc(${width || "48%"})`, // 50% width
+      flex: `0 0 calc(${width || "31%"})`, // 50% width
       width: width, overflow: "hidden",
       // filter: "grayscale(100%)"
     }}>
     <Lottie
-      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }}
+      style={{ width: "100%", height: "100%" }}
       goTo={complaint.lottieFrame || 0}
       play={forcePlay || autoPlay}
       loop={true}

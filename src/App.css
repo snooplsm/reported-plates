@@ -3,6 +3,10 @@
   height: 100vh;
 }
 
+.calendar {
+  z-index: 1000;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

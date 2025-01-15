@@ -66,6 +66,7 @@ export enum State {
       bg: "#00000000",
       text: (isTlc:boolean) => (isTlc ? "TL&C" : "EXCELSIOR"),
       color: "#ED9C36",
+      altColor: (isTlc:boolean) => (isTlc ? "#0B0C14" : "#ED9C36")
     },
     plate: {
       bg: "#FFF",
@@ -440,6 +441,6 @@ export enum State {
   export interface StateColor {
     bg?: string,
     color: string,
-    altColor?: string
+    altColor?:  ((isTlc?: boolean) => string | undefined)
     text?: string | ((isTlc?: boolean) => string)
   }

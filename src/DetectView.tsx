@@ -303,7 +303,6 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                     sx={{
                         position: "relative",
                         overflow: "hidden",
-                        maxWidth: "400px",
                         width: "auto",
                         height: "auto", // Maintain aspect ratio                
                     }}
