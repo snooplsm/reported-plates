@@ -1,7 +1,7 @@
-import { Avatar, Box } from "@mui/material"
 import { GoogleLogin } from "@react-oauth/google"
 import { useEffect, useState } from "react"
 import {BasicSpeedDial} from "./BasicSpeedDial"
+import { Box } from "@mui/material"
 
 export interface UserProps {
     isSignedIn: boolean
@@ -19,8 +19,7 @@ export const UserView = ({isSignedIn, handleSuccess, handleError}:UserProps) => 
             if(userS) {
                 const user = JSON.parse(userS)
                 setAvatar(user.picture)
-            }
-            
+            }            
         }
     }, [isSignedIn])
     return (<Box sx={{

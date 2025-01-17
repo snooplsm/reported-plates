@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { TextareaAutosize as BaseTextareaAutosize } from '@mui/base/TextareaAutosize';
 import { Box, styled } from '@mui/system';
 

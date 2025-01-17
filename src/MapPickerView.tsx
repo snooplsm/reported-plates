@@ -4,19 +4,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import Box from '@mui/material/Box';
 import 'leaflet/dist/leaflet.css';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import {GeoSearchAutocomplete} from './api/ny/nyc/GeoSearchAutocomplete';
 
 type MapProps = {
-    latLng?: Number[],
+    latLng?: number[],
     location?: GeoSearchResponse
 };
 
 type MarkerProps = {
-    center: Number[],
+    center: number[],
     children: React.ReactNode,
-    onDragEnd: (latLng:Number[])=>void
+    onDragEnd: (latLng:number[])=>void
 }
 
 const DraggableMarker = ({ center, children, onDragEnd }: MarkerProps) => {
@@ -41,10 +39,6 @@ const DraggableMarker = ({ center, children, onDragEnd }: MarkerProps) => {
         setPosition(center)
     }, [center])
 
-    const toggleDraggable = useCallback(() => {
-        setDraggable((d) => !d)
-    }, [])
-
     return (
         <Marker
             draggable={draggable}
@@ -58,7 +52,7 @@ const DraggableMarker = ({ center, children, onDragEnd }: MarkerProps) => {
 
 export const MapPickerView = ({ latLng, location }:MapProps) => {
 
-    const [center, setCenter] = useState<Number[]>([40.76, -73.99])
+    const [center, setCenter] = useState([40.76, -73.99])
     const [centerLocation, setCenterLocation] = useState<GeoSearchResponse>()
 
     const [initial, setInitial] = useState<GeoSearchResponse>()
@@ -127,7 +121,10 @@ export const MapPickerView = ({ latLng, location }:MapProps) => {
                 style={{
                     width: "100%",
                     height: "100%"
-                }} center={center} zoom={16} scrollWheelZoom={true}>
+                }} 
+                center={center} 
+                zoom={16} 
+                scrollWheelZoom={true}>
                     <TileLayer
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />

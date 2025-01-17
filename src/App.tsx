@@ -23,7 +23,7 @@ import { BasicDateTimePicker } from './BasicDateTimePicker';
 import { MapPickerView } from './MapPickerView';
 import { JwtPayload } from 'jwt-decode';
 import LoginModal from './LoginModal';
-import { isLoggedIn, login, Report, ReportErrors, ReportError, submitReport } from './Auth';
+import { isLoggedIn, login, Report, ReportErrors, ReportError, submitReport, userLogin, userLogout } from './Auth';
 import TextArea from './TextArea';
 
 
@@ -62,6 +62,19 @@ function App() {
   const [dragComponent, setDragComponent] = useState<HTMLElement>()
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  useEffect(()=> {
+    const loginSub = userLogin.subscribe(()=> {
+      setIsSignedIn(true)
+    })
+    const logoutSub = userLogout.subscribe(()=> {
+      setIsSignedIn(false)
+    })
+    return () => {
+      loginSub.unsubscribe()
+      logoutSub.unsubscribe()
+    }
+  },[])
 
   const onPlate = (plates: PlateDetection) => { 
     if(!plate) {
@@ -253,7 +266,7 @@ function App() {
           }}
         >
           <UserView isSignedIn={isSignedIn} handleSuccess={handleSuccess} handleError={handleError} />
-          <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} onChange={setComplaint} />
+          <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} selectedComplaint={complaint} onChange={setComplaint} />
           <Box sx={{
             position: "relative",
             maxHeight: "80px",

@@ -4,7 +4,7 @@ import { Feature, GeoSearchResponse } from "./nyc";
 
 interface GeoSearchProps {
     initial?: GeoSearchResponse,
-    onChange?: (resp:GeoSearchResponse, value?:Feature) => void
+    onChange?: (resp:GeoSearchResponse, value:Feature) => void
 }
 
 export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, initial }) => {

@@ -1,35 +1,94 @@
 import Box from '@mui/material/Box';
-import SpeedDial from '@mui/material/SpeedDial';
-import SpeedDialIcon from '@mui/material/SpeedDialIcon';
-import SpeedDialAction from '@mui/material/SpeedDialAction';
-import Logout from '@mui/icons-material/Logout';
-import SaveIcon from '@mui/icons-material/Save';
-import PrintIcon from '@mui/icons-material/Print';
-import ShareIcon from '@mui/icons-material/Share';
-import { Avatar } from '@mui/material';
+import { Avatar, ClickAwayListener, Fab, Grow, MenuItem, MenuList, Paper, Popper } from '@mui/material';
 import { logout } from './Auth';
-
-const actions = [
-  { icon: <Logout />, name: 'Logout', onClick: ()=> {
-    logout()
-  } },
-];
+import { useEffect, useRef, useState } from 'react';
 
 export interface SpeedProps {
   avatarUrl?:string
 }
 
 export const BasicSpeedDial = ({avatarUrl}:SpeedProps) => {
+
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false);
+  const handleToggle = () => {
+    setOpen((prevOpen) => !prevOpen);
+  };
+
+  const handleClose = (event: Event | React.SyntheticEvent) => {
+    if (
+      anchorRef.current &&
+      anchorRef.current.contains(event.target as HTMLElement)
+    ) {
+      return;
+    }
+
+    setOpen(false);
+  };
+
+  const handleLogout = async (event: Event | React.SyntheticEvent) => {
+    await logout()
+    setOpen(false)
+  }
+  const prevOpen = useRef(open);
+
+  useEffect(() => {
+    if (prevOpen.current === true && open === false) {
+      anchorRef.current!.focus();
+    }
+
+    prevOpen.current = open;
+  }, [open]);
+  
   return (
     <Box sx={{ 
       position: 'relative', // Establishes positioning context for SpeedDial,
-      minHeight: 'auto', // Adjust height to content size
+      width: "20px",
+      height: "20px",
       right: 0
      }}>
-      <SpeedDial
+      <Fab ref={anchorRef} onClick={handleToggle}>
+        <Avatar sx={{width: "100%", height: "100%"}} src={avatarUrl}/>
+      </Fab>
+      <Popper
+          sx={{
+            zIndex: 7
+          }}
+          open={open}
+          anchorEl={anchorRef.current}
+          role={undefined}
+          placement="bottom-start"
+          transition
+          disablePortal
+        >
+          {({ TransitionProps, placement }) => (
+            <Grow
+              {...TransitionProps}
+              style={{
+                transformOrigin:
+                  placement === 'bottom-start' ? 'left top' : 'left bottom',
+              }}
+            >
+              <Paper>
+                <ClickAwayListener onClickAway={handleClose}>
+                  <MenuList
+                    autoFocusItem={open}
+                    id="composition-menu"
+                    aria-labelledby="composition-button"
+                    // onKeyDown={handleListKeyDown}
+                  >
+                    <MenuItem onClick={handleClose}>My Reports</MenuItem>
+                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                  </MenuList>
+                </ClickAwayListener>
+              </Paper>
+            </Grow>
+          )}
+        </Popper>
+      {/* <SpeedDial
         ariaLabel="SpeedDial basic example"
-        direction='right'
-        sx={{ position: 'reltive', right: 0 }}
+        direction='up'
+        sx={{ position: 'reltive', height: "100",right: 0 }}
         icon={<Avatar src={avatarUrl}  />}
       >
         {actions.map((action) => (
@@ -40,7 +99,7 @@ export const BasicSpeedDial = ({avatarUrl}:SpeedProps) => {
             tooltipTitle={action.name}
           />
         ))}
-      </SpeedDial>
+      </SpeedDial> */}
     </Box>
   );
 }

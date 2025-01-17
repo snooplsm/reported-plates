@@ -10,6 +10,9 @@ const PARSE_JAVASCRIPT_KEY = 'LeBKOerWTXGBGRLE0yvg2bXa5RRv4e8PuC6INEFA';
 Parse.initialize(PARSE_APPLICATION_ID, PARSE_JAVASCRIPT_KEY);
 Parse.serverURL = PARSE_HOST_URL;
 
+export const userLogout = new Subject<boolean>()
+export const userLogin = new Subject<User>()
+
 export type User = Parse.User
 
 export const loginWithPassword = async(email:string, password:string, accessToken:string, jwt:JwtPayload):Promise<User> => {
@@ -53,21 +56,6 @@ export interface Report {
     passenger: boolean
     typeofcomplaint: ComplaintType
 }
-
-// interface Address {
-//     neighborhood_1_key: string
-//     neighborhood_2_key: string
-//     neighborhood_2: string
-//     neighborhood_key: string
-//     neighborhood:string
-//     street_number_key: string
-//     street_number: string
-//     route: string
-//     route_key: string
-    
-//     neighborhood_1: string
-//     postal_code: string
-// }
 
 export const submitReport = async (r:Report) => {
     const current = await Parse.User.current()
@@ -141,6 +129,7 @@ export const login = async (response:any, onAlreadyExists:(accessToken:string,de
             loggedInUser.set('LastName', decoded.family_name)
         }
         await loggedInUser.save()
+        userLogin.next(loggedInUser)
         return loggedInUser
     } catch(e) {
         if(e.code==202) {
@@ -163,6 +152,8 @@ export const isLoggedIn = async():Promise<User | undefined> => {
 }
 
 export const logout = async():Promise<any> => {
-    await Parse.User.logout()
+    await Parse.User.logOut()
+    localStorage.clear()
+    userLogout.next(true)
     return true
 }
