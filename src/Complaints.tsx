@@ -18,11 +18,11 @@ export interface Complaint {
 }
 
 export enum ComplaintType {
-  BlockedBikeLane = 'Blocked Bike Lane',
-  BlockedCrosswalk = 'Blocked Crosswalk',
-  RanRedLight = 'Ran Red Light',
-  ParkedIllegally = 'Parked Illegally',
-  DroveRecklessly = 'Drove Recklessly'
+  BlockedBikeLane = 'Blocked the bike lane',
+  BlockedCrosswalk = 'Blocked the crosswalk',
+  RanRedLight = 'Ran a red light or stop sign',
+  ParkedIllegally = 'Parked illegally',
+  DroveRecklessly = 'Drove recklessly'
 }
 
 export enum MediaType {
@@ -63,21 +63,6 @@ export const complaints: Complaint[] = [
     lottieSpeed: 2,
     src: noParking
   }
-  // {
-  //     type: ComplaintType.RanRedLight,
-  //     media: MediaType.Lottie,
-  //     src: "/images/complaint/ranredlight.lotie"
-  // },
-  // {
-  //     type: ComplaintType.DroveRecklessly,
-  //     media: MediaType.Lottie,
-  //     src: "/images/complaint/reckless.lotie"
-  // },
-  // {
-  //     type: ComplaintType.ParkedIllegally,
-  //     media: MediaType.Image,
-  //     src: "/images/complaint/parkedillegally.jpg"
-  // }
 ]
 
 export interface ComplaintProps {
@@ -128,9 +113,12 @@ interface ComplaintsProps {
   onFiles: (complaint: Complaint, file: File[]) => void,
   step?: Steps,
   hoveredStep?: Steps | undefined
+  showCaption?: boolean,
+  selectedComplaint?: Complaint
+  onChange: (complaint?:Complaint)=>void
 }
 
-export const ComplaintsView = ({ onFiles, step, hoveredStep }: ComplaintsProps) => {
+export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hoveredStep, showCaption }: ComplaintsProps) => {
 
   const [hoveredIndex, setHoveredIndex] = useState<number | undefined>()
 
@@ -143,6 +131,23 @@ export const ComplaintsView = ({ onFiles, step, hoveredStep }: ComplaintsProps) 
       setSelectedIndex(index)
     }
   }
+
+  useEffect(()=> {
+    if(selectedIndex) {
+      onChange(complaints[selectedIndex])
+    } else {
+      onChange()
+    }
+  }, [selectedIndex])
+
+  useEffect(() => {
+    const selectedIndex = complaints.findIndex(k=> k==selectedComplaint)
+    if(selectedIndex>-1) {
+      setSelectedIndex(selectedIndex)
+    } else {
+      setSelectedIndex(undefined)
+    }
+  }, [selectedComplaint])
 
   const [tooltip, setTooltip] = useState("Blocked")
 
@@ -279,7 +284,7 @@ export const ComplaintsView = ({ onFiles, step, hoveredStep }: ComplaintsProps) 
           </Paper>
         </Box>
       </Box>
-      <Typography sx={{ top: 0, fontSize: ".75rem", paddingLeft: ".2rem", paddingRight: ".2rem" }}>Left-to-Right and Top-to-Bottom: <u>Blocked bike lane</u>, <u>crosswalk</u>, <u>ran red light</u>, <u>drove recklessly</u>, <u>illegal parking</u>.</Typography>
+      {showCaption && <Typography sx={{ top: 0, fontSize: ".75rem", paddingLeft: ".2rem", paddingRight: ".2rem" }}>Left-to-Right and Top-to-Bottom: <u>Blocked bike lane</u>, <u>crosswalk</u>, <u>ran red light</u>, <u>drove recklessly</u>, <u>illegal parking</u>.</Typography>}
     </Box>
   );
 }

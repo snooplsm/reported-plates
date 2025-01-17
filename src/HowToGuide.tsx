@@ -17,26 +17,18 @@ export enum Steps {
 interface HowToGuideProps {
     videoUrl: string; // URL of the 1:1 video for Step 1
     onStepHovered?: (step?: Steps) => void
+    isSignedIn: boolean,
+    handleSuccess: (credential:any) => void
+    handleError: () =>void
+
 }
 
-const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
+const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handleError }: HowToGuideProps) => {
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [direction, setDirection] = useState<'down' | 'up'>('down');
 
     const [canScroll, setCanScroll] = useState(true)
-
-    const [showLoginModal, setShowLoginModal] = useState<[string,JwtPayload]>()
-
-    const [isSignedIn, setIsSignedIn] = useState(false)
-
-    useEffect(()=> {
-        const getIs = async () => {
-            const user = await isLoggedIn()
-            setIsSignedIn(user!=null)
-        }
-        getIs()
-    },[])
 
     useEffect(() => {
         const userAgent = navigator.userAgent;
@@ -44,24 +36,6 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
             setCanScroll(true)
         }
     }, []);
-
-    const handleSuccess = (credentialResponse: any) => {
-        // Handle the successful login here
-        console.log('Google login successful', credentialResponse);
-        login(credentialResponse, (accessToken:string, jwt:JwtPayload)=> {
-            setShowLoginModal([accessToken,jwt])            
-        })
-        .then(resp=> {
-            setIsSignedIn(true)
-        }).catch(e=> {
-            console.log(e)
-        })
-    };
-
-    const handleError = () => {
-        // Handle login errors here
-        console.log('Google login failed');
-    };
 
 
     useEffect(() => {
@@ -115,7 +89,7 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
             }}
         >
             {/* Title */}
-            <Typography variant="h4" align="center" sx={{ fontWeight: 'bold', marginBottom: 2 }}>
+            <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
                 How to Submit a Vehicle Complaint
             </Typography>
 
@@ -129,9 +103,9 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
                     backgroundColor: '#f9f9f9',
                 }}
             >
-                <Typography variant="h5" >
+                {/* <Typography variant="h5" >
                     Steps:
-                </Typography>
+                </Typography> */}
                 <List>
                     {!isSignedIn && <ListItem
                         onMouseOver={(e) => {
@@ -184,7 +158,7 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
                         />
                         <Box
                             sx={{
-                                height: "15rem",
+                                height: "8rem",
                                 position: 'relative',
                                 WebkitTransform: "translateZ(0)",
                                 borderRadius: 4,
@@ -198,7 +172,7 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
                                 style={{
                                     top: 0,
                                     left: 0,
-                                    height: "15rem",
+                                    height: "8rem",
                                     borderRadius: 4,
                                     overflow: 'hidden',
                                     WebkitTransform: "translateZ(0)",
@@ -242,7 +216,7 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
                                 overflow: 'auto',
                             }}
                         >
-                            <ComplaintsView onFiles={() => { }} />
+                            <ComplaintsView onChange={()=>{}} onFiles={() => { }} />
                         </Box>
                     </ListItem>
                     <ListItem
@@ -269,25 +243,33 @@ const HowToGuide = ({ videoUrl, onStepHovered }: HowToGuideProps) => {
                     <ListItem onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>
                         <ListItemText
                             primary={`${step}. Verify and submit.`}
-                            secondary="Ensure all data points are accurate and submit the complaint for review."
+                            secondary={<ol type="i">
+                                {[
+                                    <><b>Complaint Type:</b> Confirm you selected the correct complaint type</>,
+                                    <><b>License Plate and State:</b> Verify the license plate and state match the photo, if applicable</>,
+                                    <><b>Incident Address:</b> Ensure the address matches the location where the photo was taken</>,
+                                    <><b>Time of Incident:</b> Double-check the reported time of the incident for accuracy</>,
+                                    <>Once verified, submit the report and pledge to testify if required</>                            
+
+                                ].map(x=><li>{x}.</li>)}
+                                
+                            </ol>}
+                        />
+                    </ListItem>
+                    <ListItem>
+                        <ListItemText
+                            primary={<>{step}. <a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></>}
+                            secondary={
+                                <>
+                                Our slack channel is a great resource to learn the process of filing complaints with the TL&C
+                                </>
+                            }
                         />
                     </ListItem>
                 </List>
             </Paper>
         </Box>
-        {showLoginModal && 
-            <LoginModal 
-            open={showLoginModal!=undefined} 
-            payload={showLoginModal} 
-            onLoggedIn={(user)=> {
-                setIsSignedIn(true)
-                setShowLoginModal(undefined)
-            }}  
-            onClose={()=>{
-            console.log("close")
-            setShowLoginModal(undefined)
-        }
-            } />}
+        
         </>
     );
 };

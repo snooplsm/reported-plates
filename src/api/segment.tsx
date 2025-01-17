@@ -1090,6 +1090,7 @@ export interface PlateDetection {
     state?: State
     stateConfidence?:number
     text?: string
+    plateOverride?:string
     textWithUnderscores?: string
     textAvgProb?: number
     textLetterProb?: number[]

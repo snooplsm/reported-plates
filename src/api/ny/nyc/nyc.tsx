@@ -22,6 +22,7 @@ export interface Feature {
       lat: number; // Latitude of the query point
       lon: number; // Longitude of the query point
     };
+    id: string;
     name?: string; // Name of the venue or address
     borough?: string; // Borough name
     neighborhood?: string; // Neighborhood name

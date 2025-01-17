@@ -5,9 +5,10 @@ import { PlateDetection } from "./api/segment"
 
 export interface DetectionProps {
     plate?: PlateDetection
+    onPlateChange: (plate:PlateDetection) => void
 }
 
-export const DetectionView = ({ plate }: DetectionProps) => {
+export const DetectionView = ({ plate, onPlateChange }: DetectionProps) => {
     return (<>
         <Box
         sx={{
@@ -15,7 +16,7 @@ export const DetectionView = ({ plate }: DetectionProps) => {
             height: "auto"
         }}
         >
-            <LicensePlate plate={plate} />
+            <LicensePlate onPlateChange={onPlateChange} plate={plate} />
         </Box>
         <Box
         >

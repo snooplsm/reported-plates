@@ -3,7 +3,7 @@ import { canvasToBlob, DetectBox, detectPlate, downloadMatAsImage, PlateDetectio
 import Box from '@mui/material/Box';
 import LicensePlate from './LicensePlate';
 import LicensePlateImage from './LicensePlateImage';
-import { ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { ToggleButtonGroup, ToggleButton, Paper } from '@mui/material';
 import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -207,7 +207,6 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
 
     useEffect(() => {
         const fetchImage = async () => {
-            if (imageSrc) return; // Prevent redundant execution
             let file2Use: string;
 
             if (file.type.toLowerCase() === "image/heic") {
@@ -293,18 +292,24 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
 
     }, [scale, boundingBox, offsetX, offsetY])
 
-    if (imageSrc == null) {
+    if (file == null) {
         return null
     } else
         return (
-            <Box>
+            <Paper sx={{
+                position: "relative",
+                overflow: "hidden",
+                margin: 1,
+                width: "auto",
+                background: "green",
+            }}>
                 <Box
                     ref={boxRef}
                     sx={{
                         position: "relative",
                         overflow: "hidden",
+                        background: "blue",
                         width: "auto",
-                        height: "auto", // Maintain aspect ratio                
                     }}
                     onMouseDown={onMouseDown}
                     onMouseUp={onMouseUp}
@@ -344,7 +349,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                     onChange={handleToggle}
                     aria-label="Pan or Label"
                     sx={{
-                        display: "flex",
+                        background: "red",
                         gap: "0.5rem",
                         margin: "1rem",
                     }}
@@ -364,7 +369,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                 </ToggleButtonGroup>                
                 {/* <GeoSearchAutocomplete initial={location} onChange={onLocationSearch} /> */}
                 {/* <MapPickerView latLng={latLng} location={location} /> */}
-            </Box>
+            </Paper>
         )
 }
 

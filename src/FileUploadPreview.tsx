@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
 interface FileProps {
-  file: File
+  file: File,
+  onClick: ()=>void
 }
 
-export const FileUploadPreview = ({file}:FileProps) => {
+export const FileUploadPreview = ({file, onClick}:FileProps) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
   useEffect(()=> {
@@ -19,7 +20,11 @@ export const FileUploadPreview = ({file}:FileProps) => {
     <img
         src={imageSrc}
         alt="Uploaded Preview"
-        style={{ width: '50%', objectFit: "cover", objectPosition: "center", height: "100%", borderRadius: '10px' }}
+        onClick={onClick}
+        style={{ 
+          aspectRatio: "1/1",
+          height: "auto",
+          width: '33%', objectFit: "cover", objectPosition: "center", borderRadius: '10px' }}
     />
   );
 };

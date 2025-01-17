@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import cv from "@techstark/opencv-js";
 import * as ExifReader from 'exifreader';
@@ -6,13 +6,12 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, Icon, Input, Paper, Portal, ThemeProvider, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
-import { Complaint, ComplaintsView } from './Complaints';
-import ranRedLight from "./ranredlight.json"
-import Lottie from 'lottie-react';
+import { Complaint, ComplaintsView, ComplaintType } from './Complaints';
+import { UserView } from './UserView'
 import { DetectionView } from './DetectionView';
 import FileUploadPreview from './FileUploadPreview';
 import SendIcon from '@mui/icons-material/Send';
@@ -21,13 +20,24 @@ import 'react-datetime-picker/dist/DateTimePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import 'react-clock/dist/Clock.css';
 import { BasicDateTimePicker } from './BasicDateTimePicker';
+import { MapPickerView } from './MapPickerView';
+import { JwtPayload } from 'jwt-decode';
+import LoginModal from './LoginModal';
+import { isLoggedIn, login, Report, ReportErrors, ReportError, submitReport } from './Auth';
+import TextArea from './TextArea';
 
 
 function App() {
 
   const [loading, setLoading] = useState({ text: "Loading OpenCV.js", progress: NaN });
 
-  const [files, setFiles] = useState<File[]>()
+  const [submitting, setSubmitting] = useState(false)
+
+  const [files, setFiles] = useState(new Set<File>())
+  const [currentFile, setCurrentFile] = useState<number>()
+  const [fileNames] = useState<Set<string>>(new Set())
+
+  const [complaint, setComplaint] = useState<Complaint>()
 
   const [boxes, setBoxes] = useState<DetectBox[]>()
 
@@ -39,6 +49,10 @@ function App() {
 
   const [hoveredStep, setHoveredStep] = useState<Steps | undefined>()
 
+  const [showLoginModal, setShowLoginModal] = useState<[string, JwtPayload]>()
+
+  const [isSignedIn, setIsSignedIn] = useState(false)
+
   const [dateOfIncident, setDateOfIncident] = useState<Date>()
 
   const [loaded, setLoaded] = useState(false)
@@ -49,14 +63,60 @@ function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const onPlate = (plate: PlateDetection) => { }
+  const onPlate = (plates: PlateDetection) => { 
+    if(!plate) {
+      setPlate(plates)
+    }
+    if(plate) {
+      plate.state = plates.state
+      plate.text = plates.text
+      plate.plateOverride = plates.plateOverride
+      plate.tlc = plates.tlc
+      plate.box = plates.box
+      plate.image = plates.image
+      plate.nypd = plates.nypd
+      plate.textLetterProb = plates.textLetterProb
+      plate.textWithUnderscores = plates.textWithUnderscores
+      plate.stateConfidence = plates.stateConfidence
+      setPlate(plate)
+    }
+
+  }
 
   const [plate, setPlate] = useState<PlateDetection>()
   const [results, setResults] = useState<DetectBox[]>()
   const [car, setCar] = useState<DetectBox>()
 
+  const [reportDescription, setReportDescription] = useState<string>('')
+
   type MediaType = 'blockedbikelane' | 'blockedcrosswalk' | 'ranredlight' | 'parkedillegally' | 'droverecklessly' | null;
   const [selected, setSelected] = useState<MediaType>(null);
+
+  useEffect(() => {
+    const signedIn = async () => {
+      const user = await isLoggedIn()
+      setIsSignedIn(user != undefined)
+    }
+    signedIn()
+  }, [])
+
+  const handleSuccess = (credentialResponse: any) => {
+    // Handle the successful login here
+    console.log('Google login successful', credentialResponse);
+    login(credentialResponse, (accessToken: string, jwt: JwtPayload) => {
+      setShowLoginModal([accessToken, jwt])
+    })
+      .then(resp => {
+        setIsSignedIn(true)
+      }).catch(e => {
+        console.log(e)
+      })
+  };
+
+  const handleError = () => {
+    // Handle login errors here
+    console.log('Google login failed');
+  };
 
   const handleSelection = (
     event: React.MouseEvent<HTMLElement>,
@@ -92,12 +152,22 @@ function App() {
     setLoaded(true)
   }
 
-  // const handleFilesChange = async (e: React.DragEvent<HTMLInputElement>) => {
-  //   handleFiles(e.currentTarget.files)
-  // }
-
-  const onFiles = async (complaint?: Complaint, files: File[]) => {
-    setFiles(files)
+  const onFiles = async (complaint?: Complaint, filez?: File[]) => {
+    if (filez) {
+      const newFiles = new Set<File>(files)
+      filez.forEach(file=> {
+        if(!fileNames.has(file.name)) {
+          newFiles.add(file)
+        }
+      })
+      setFiles(newFiles)
+      if(currentFile == undefined) {
+        setCurrentFile(0)
+      }
+    }
+    if(complaint) {
+      setComplaint(complaint)
+    }
 
     const exifGetter = async (file: File) => {
       const hash = await getFileHash(file)
@@ -135,8 +205,8 @@ function App() {
       }
     }
 
-    for (const file of files) {
-      if (plate) {
+    for (const file of (filez || [])) {
+      if (plate?.image) {
         break
       }
       segment(file)
@@ -158,31 +228,18 @@ function App() {
         }).catch(error => {
           console.log(error)
         })
-      exifGetter(file).then(ok => {
-
+        exifGetter(file).then(ok => {
+          
       })
     }
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLInputElement>) => {
-    let files: FileList | null = null;
-
-    if ("dataTransfer" in e) {
-      // Handle drag-and-drop event
-      files = e.dataTransfer.files;
-    } else {
-      // Handle input file change event
-      files = e.currentTarget.files;
-    }
-    onFiles(undefined, Array.from(files!))
-  }
   return (
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box
         display="flex"
-        maxWidth={"1280px"}
         height="100vh"
       >
         {/* Left Column */}
@@ -191,22 +248,26 @@ function App() {
           display="flex"
           flexDirection="column"
           justifyContent="start"
+          sx={{
+            // overflowY: "auto"
+          }}
         >
-          <ComplaintsView step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} />
+          <UserView isSignedIn={isSignedIn} handleSuccess={handleSuccess} handleError={handleError} />
+          <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} onChange={setComplaint} />
           <Box sx={{
             position: "relative",
             maxHeight: "80px",
             height: "auto",
-            width: "100%"
+            width: "100%",
+            overflow: "hidden"
           }}>
-            {files?.map(x => {
-              return <FileUploadPreview file={x} />
+            {[...(files||[])].map((x,index) => {
+              return <FileUploadPreview onClick={()=>{              
+                setCurrentFile(index)}} file={x} />
             })}
           </Box>
-          <DetectionView plate={plate} />
-          <BasicDateTimePicker onChange={(value) => {
-            setDateOfIncident(value)
-          }} value={dateOfIncident} />
+          <DetectionView onPlateChange={onPlate} plate={plate} />
+
           <Box sx={{
             position: "absolute",
             bottom: 0,
@@ -217,28 +278,126 @@ function App() {
                 margin: 2
               }}
               size='large'
-              // onClick={handleClick}
+              onClick={() => {
+                
+                const err:ReportErrors[] = []
+                let license:string | undefined
+                let state:string | undefined
+                if(!plate) {
+                  err.push(ReportErrors.MISSING_PLATE)
+                } else {
+                  license = plate?.plateOverride?.trim() ? plate.plateOverride : plate?.text
+                  if(!license) {
+                    err.push(ReportErrors.MISSING_PLATE)
+                  }
+                  
+                  state = plate?.state
+                  if(!state) {
+                    err.push(ReportErrors.MISSING_PLATE_STATE)
+                  }
+                }
+                
+                const fileZ = files
+                if((!fileZ || (files.size || 0) < 1)) {
+                  err.push(ReportErrors.NO_PHOTOS)
+                }
+
+                const timeofreport = dateOfIncident
+                if(!timeofreport) {
+                  err.push(ReportErrors.MISSING_DATE)
+                }
+
+                const addy = location?.features[0]
+                
+                if(!addy) {
+                  err.push(ReportErrors.MISSING_ADDRESS)
+                }
+
+              
+                const latLng = location?.features[0].geometry
+                if(!latLng) {
+                  err.push(ReportErrors.MISSING_ADDRESS)
+                }
+
+                const _complaint = complaint
+
+                if(!_complaint) {
+                  err.push(ReportErrors.MISSING_COMPLAINT)
+                }
+
+                if(err.length>0) {
+                  throw ReportError(err)
+                }
+
+                const report:Report = {
+                  license: license!,
+                  state: state!,
+                  files: [...fileZ]!,
+                  timeofreport: timeofreport!,
+                  address: addy!,
+                  reportDescription: '',
+                  testify: true,
+                  passenger: false,
+                  typeofcomplaint: complaint?.type!
+                }
+                console.log(report)
+                setSubmitting(true)
+                submitReport(report)
+                .then(result=> {
+                  setSubmitting(false)
+                  console.log("success", result)
+                }).catch(error=> {
+                  setSubmitting(false)
+                  console.log(error)
+                })
+              }}
               endIcon={<SendIcon />}
-              loading={loading}
+              loading={submitting}
               loadingPosition="end"
               variant="contained"
             >
               Submit Complaint
             </Button>
           </Box>
-          <Input aria-label="Description" multiline placeholder="Type something…" />
         </Box>
         {/* Right Column */}
         <Box
-          flex={1}
+          flex="0 0 50%"
           display="flex"
         >
-          {(!files || !files[0]) &&
+          {(currentFile==undefined) &&
             <HowToGuide onStepHovered={(step) => {
               setHoveredStep(step)
-            }} videoUrl='video/howto1.mp4' />}
-          {files && files[0] && <DetectView file={files[0]} />}
+            }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
+          {currentFile && <DetectView file={[...files][currentFile]} />}
         </Box>
+        <Box flex="1" sx={{
+          marginTop: 1,
+          marginRight: 1,
+        }}>
+          <MapPickerView latLng={latLng} location={location} />
+          <BasicDateTimePicker onChange={(value) => {
+            setDateOfIncident(value)
+          }} value={dateOfIncident} />
+
+          <TextArea
+            value={reportDescription}
+            onChange={setReportDescription}
+          />
+        </Box>
+        {showLoginModal &&
+          <LoginModal
+            open={showLoginModal != undefined}
+            payload={showLoginModal}
+            onLoggedIn={(user) => {
+              setIsSignedIn(true)
+              setShowLoginModal(undefined)
+            }}
+            onClose={() => {
+              console.log("close")
+              setShowLoginModal(undefined)
+            }
+            } />}
       </Box>
     </ThemeProvider>
   )

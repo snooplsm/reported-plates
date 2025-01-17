@@ -5,10 +5,10 @@ import { NYSTATE, State, StatePres, states } from "./States";
 
 type LicensePlateProps = {
   plate?: PlateDetection; // The text on the license plate
-  plateOverride?: string
+  onPlateChange: (plate:PlateDetection) => void
 };
 
-const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
+const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
 
   const [color, setColor] = useState(NYSTATE.plate.color)
   const [bgColor, setBgColor] = useState(NYSTATE.plate.bg)
@@ -25,8 +25,11 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
   const [plateState, setPlateState] = useState(NYSTATE)
 
   useEffect(() => {
-    setPlateText(plate?.text || plateOverride || "NONE")
-  }, [plate, plateOverride]);
+    setPlateText(plate?.text || "NONE")
+    if(plate) {
+      onPlateChange(plate)
+    }
+  }, [plate]);
 
   useEffect(() => {
     let fontSize = "3.9rem";
@@ -49,6 +52,12 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
     setBgColor(bg);
     setBottomText(bottomText);
     setFontSize(fontSize)
+    if(plate) {
+      plate.plateOverride = plateText
+      plate.state = plateState.state
+      onPlateChange(plate)
+    }
+    
   }, [plateState, plateText])
 
   return (
@@ -88,7 +97,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           InputProps={{
             disableUnderline: true, // Disable underline
             sx: {
-              fontSize: "clamp(10px, 3vw, 2.3rem)",
+              fontSize: "3.8vh",
               fontWeight: 600,  // Remove padding
               textAlign: "center",
               width: "100%",
@@ -112,6 +121,11 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           onChange={(text) => {
             const [refined, tlc] = refinePlateForTLC(text.currentTarget.value)
             setPlateText(refined)
+            onPlateChange(plate || {
+              text: refined.toUpperCase(),
+              state: plateState.state,
+              tlc: tlc,
+            } as PlateDetection)
           }}
           value={plateText.toUpperCase()}
         />
@@ -120,7 +134,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: ".8rem",
+            top: "1.3vh",
             width: "25%",
             zIndex: 3,
             height: ".15rem", // Adjust thickness
@@ -131,7 +145,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: "1rem",
+            top: "1.7vh",
             width: "25%",
             zIndex: 3,
             height: ".3rem", // Adjust thickness
@@ -142,7 +156,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: ".8rem",
+            top: "1.3vh",
             right: 0,
             width: "25%",
             zIndex: 3,
@@ -156,7 +170,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           sx={{
             position: 'absolute',
             right: 0,
-            top: "1rem",
+            top: "1.7vh",
             width: "25%",
             zIndex: 3,
             height: ".3rem", // Adjust thickness
@@ -174,7 +188,7 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           // alignItems: "center",
           // justifyContent: "center",
 
-          height: "33%", // Adjust thickness
+          height: "30%", // Adjust thickness
           background: plateState.top.bg, // Blue color
         }}
       > {true &&<><Tooltip title="Click to change" placement="top"><Typography
@@ -182,10 +196,10 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           setMenuOpen(true)
         }}
         sx={{
-          fontSize: "clamp(10px, 2rem, 1.25rem)",
+          fontSize: "1.2vw",
           color: plateState.top.color,
           height: "100%",
-          paddingTop: "2%",
+          paddingTop: ".1vh",
           textAlign: "center",
           textWrap: "nowrap",
           width: "100%",
@@ -215,12 +229,12 @@ const LicensePlate = ({ plate, plateOverride }: LicensePlateProps) => {
           justifyContent: "center",
           zIndex: 0,
           width: "100%",
-          height: "2rem", // Adjust thickness
+          height: "20%", // Adjust thickness
           backgroundColor: bottomBgColor, // Yellow color
         }}
       ><Typography
         sx={{
-          fontSize: "clamp(.5, 1.1vw, 1.2rem)",
+          fontSize: "1.5vh",
           zIndex: 2, // Higher than the lines
           fontWeight: 600,
           color: plateState.bottom.altColor?.(plate?.tlc || false) || bottomTextColor, // Default text color
