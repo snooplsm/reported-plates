@@ -1,18 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { canvasToBlob, DetectBox, detectPlate, downloadMatAsImage, PlateDetection } from './api/segment';
+import { DetectBox, detectPlate, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import LicensePlate from './LicensePlate';
-import LicensePlateImage from './LicensePlateImage';
-import { ToggleButtonGroup, ToggleButton, Paper } from '@mui/material';
+import { ToggleButtonGroup, ToggleButton, Paper, IconButton, Tooltip } from '@mui/material';
 import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import cv from "@techstark/opencv-js";
 import heic2any from "heic2any";
-import { MapPickerView } from './MapPickerView';
+import FilterCenterFocusIcon from '@mui/icons-material/FilterCenterFocus';
 import { Feature, GeoSearchResponse } from './api/ny/nyc/nyc';
-import GeoSearchAutocomplete from './api/ny/nyc/GeoSearchAutocomplete';
 
 type DetectProps = {
     file: File; // The title displayed on the card
@@ -21,6 +18,7 @@ type DetectProps = {
     onLocationChange?: (resp: GeoSearchResponse, feature: Feature) => void
     location?: GeoSearchResponse,
     latLng?: Number[]
+    onCarWithPlate?:(result:DetectBox[], car: DetectBox) => void
 };
 
 enum CanvasOption {
@@ -30,7 +28,7 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
-const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:DetectProps) => {
+const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, location, latLng }:DetectProps) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
@@ -298,17 +296,15 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
         return (
             <Paper sx={{
                 position: "relative",
-                overflow: "hidden",
+                overflow: "auto",
                 margin: 1,
                 width: "auto",
-                background: "green",
             }}>
                 <Box
                     ref={boxRef}
                     sx={{
                         position: "relative",
                         overflow: "hidden",
-                        background: "blue",
                         width: "auto",
                     }}
                     onMouseDown={onMouseDown}
@@ -325,6 +321,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                             transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
                             width: "100%",
                             height: "auto",
+                            maxHeight: "800px",
                             display: "block", // Prevent inline-block issues
                             cursor: cursor,
                         }}
@@ -349,7 +346,6 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                     onChange={handleToggle}
                     aria-label="Pan or Label"
                     sx={{
-                        background: "red",
                         gap: "0.5rem",
                         margin: "1rem",
                     }}
@@ -366,7 +362,25 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, location, latLng }:
                     <ToggleButton value={CanvasOption.ZoomOut} aria-label="ZoomOut">
                         {selectedOptionToCursor[CanvasOption.ZoomOut]}
                     </ToggleButton>
-                </ToggleButtonGroup>                
+                </ToggleButtonGroup>
+                <Box sx={{padding: 1}}>
+                <Tooltip title="Run plate detector on this image.">
+                    <IconButton aria-label="" onClick={()=> {
+                        segment(file)
+                        .then(result=> {
+                            if (result) {
+                                const carWithPlates = result.filter(res => res.plate != null)
+                                if (carWithPlates && carWithPlates[0]) {
+                                  const carWithPlate = carWithPlates[0]
+                                  onCarWithPlate?.(result,carWithPlate)
+                                }
+                              }
+                        }).catch(console.log)
+                    }}>
+                        <FilterCenterFocusIcon/>
+                    </IconButton>
+                </Tooltip>
+                </Box>
                 {/* <GeoSearchAutocomplete initial={location} onChange={onLocationSearch} /> */}
                 {/* <MapPickerView latLng={latLng} location={location} /> */}
             </Paper>

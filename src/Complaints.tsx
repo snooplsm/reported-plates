@@ -93,7 +93,15 @@ export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex
     const even = index % 2 == 0
     if (media == MediaType.Image) {
       return (
-        <img key={complaint.type} src={complaint.src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
+        <Box component="img" key={complaint.type} src={complaint.src} sx={{
+          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center",
+
+          transition: "transform   0.1s ease", // Smooth hover effect
+          "&:hover": {
+            transform: "scale(1.2)", // Scale image on hover        
+            cursor: "pointer"
+          }
+        }} />
       )
     } else if (media == MediaType.Lottie) {
       return (
@@ -110,15 +118,17 @@ export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex
 }
 
 interface ComplaintsProps {
-  onFiles: (complaint: Complaint, file: File[]) => void,
+  onFiles: (complaint: Complaint | undefined, file: File[]) => void,
   step?: Steps,
   hoveredStep?: Steps | undefined
   showCaption?: boolean,
   selectedComplaint?: Complaint
-  onChange: (complaint?:Complaint)=>void
+  onChange: (complaint?: Complaint) => void
 }
 
 export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hoveredStep, showCaption }: ComplaintsProps) => {
+
+  const inputRef = useRef<HTMLInputElement>()
 
   const [hoveredIndex, setHoveredIndex] = useState<number | undefined>()
 
@@ -132,8 +142,8 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
     }
   }
 
-  useEffect(()=> {
-    if(selectedIndex) {
+  useEffect(() => {
+    if (selectedIndex != undefined) {
       onChange(complaints[selectedIndex])
     } else {
       onChange()
@@ -141,8 +151,8 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
   }, [selectedIndex])
 
   useEffect(() => {
-    const selectedIndex = complaints.findIndex(k=> k==selectedComplaint)
-    if(selectedIndex>-1) {
+    const selectedIndex = complaints.findIndex(k => k == selectedComplaint)
+    if (selectedIndex > -1) {
       setSelectedIndex(selectedIndex)
     } else {
       setSelectedIndex(undefined)
@@ -178,6 +188,18 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
   return (
     <Box position="relative">
       <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>
+      <input
+        ref={inputRef}
+        accept="image/jpeg, image/heic"
+        type="file"
+        hidden
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const files = Array.from(e.currentTarget.files || [])
+          if(files.length>0) {
+            const complaint = (selectedIndex && complaints[selectedIndex]) || undefined
+            onFiles(complaint, files)
+          }
+        }} />
       <Box position="relative" sx={{ width: '100%' }}>
         {/* First 4 Items */}
         <Box
@@ -219,6 +241,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
                 }}
                 onClick={() => {
                   handleSelect(index)
+                  inputRef.current.click()                  
                 }}
                 onMouseLeave={(e) => {
                   // console.log("mouse leave")
@@ -242,6 +265,9 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
           })}
           <Paper
             elevation={3}
+            onClick={()=> {
+              inputRef.current?.click()
+            }}
             sx={{
               width: "31%",
               backgroundColor: "yellow",
@@ -256,16 +282,19 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
             <Box sx={{
               position: "absolute",
               paddingLeft: "2%",
-              paddingTop: "1%"            
-            }}>
-            <CloudUploadIcon sx={{              
-              width: "22%",
-              height: "22%",
-              justifyContent: "top",
-              position: "relative", // Centers icon horizontally in its flex container
-              top: 0,
-              left: 0,
-            }} />
+              paddingTop: "1%",
+              cursor: "pointer"
+            }}
+
+            >
+              <CloudUploadIcon sx={{
+                width: "22%",
+                height: "22%",
+                justifyContent: "top",
+                position: "relative", // Centers icon horizontally in its flex container
+                top: 0,
+                left: 0,
+              }} />
             </Box>
             <Box
               sx={{
@@ -277,9 +306,10 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
                 justifyContent: "center", // Centers text horizontally
                 textAlign: "center",
                 textWrap: "wrap",
+                cursor: "pointer"
               }}
             >
-              upload <br/>or<br/>drag & drop<br/>jpeg, heic
+              upload <br />or<br />drag & drop<br />jpeg, heic
             </Box>
           </Paper>
         </Box>
@@ -326,13 +356,14 @@ export const LottiePlayer = ({ complaint, width, forcePlay }: ComplaintProps) =>
     sx={{
       flex: `0 0 calc(${width || "31%"})`, // 50% width
       width: width, overflow: "hidden",
+      objectFit: "cover", objectPosition: "center",
+      cursor: "pointer"
       // filter: "grayscale(100%)"
     }}>
     <Lottie
-      style={{ width: "100%", height: "100%" }}
       goTo={complaint.lottieFrame || 0}
       play={forcePlay || autoPlay}
-      loop={true}
+      loop={true}      
       speed={complaint.lottieSpeed || 1}
       animationData={complaint.src}
     />

@@ -20,6 +20,7 @@ declare module "@mui/material/styles" {
 }
 
 const theme = createTheme({
+
     palette: {
         primary: {
             main: "#1976d2", // Primary color

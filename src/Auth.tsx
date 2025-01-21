@@ -14,7 +14,13 @@ Parse.serverURL = PARSE_HOST_URL;
 export const userLogout = new Subject<boolean>()
 export const userLogin = new Subject<User>()
 
-export type User = Parse.User
+export interface User {
+    firstName:string
+    lastName:string
+    id:string,
+    email:string,
+    phone?:string
+}
 
 export const loginWithPassword = async(email:string, password:string, accessToken:string, jwt:JwtPayload):Promise<User> => {
     try {
@@ -43,7 +49,8 @@ export enum ReportErrors {
     NO_PHOTOS,
     MISSING_DATE,
     MISSING_ADDRESS,
-    MISSING_COMPLAINT                
+    MISSING_COMPLAINT,
+    NOT_LOGGED_IN             
   }
 
 export interface Report {
@@ -55,48 +62,50 @@ export interface Report {
     reportDescription: string
     testify: boolean
     passenger: boolean
-    typeofcomplaint: ComplaintType
+    typeofcomplaint: ComplaintType,
+    user: User
 }
+
 
 export const submitReport = async (r:Report) => {
     const current = await Parse.User.current()
     if(!current) {
         throw Error("Not Logged In")
     }
-    const Submission = Parse.Object.extend("Submission")
+    const Submission = Parse.Object.extend("submission")
     const s = new Submission();
-    const user = localStorage.getItem('user')
-    let authUser:any
-    if(user) {
-        authUser = JSON.parse(user)
-    }
-    s.set('license', r.license)
+    const user = r.user
+    const lic = 'TEST'
+    s.set('license', lic)
     s.set('state', r.state)
-    s.set('medallionNo', r.license)
+    s.set('medallionNo', lic)
     s.set('Username', current.get('email'))
     s.set('timeofreported', r.timeofreport)
     s.set('timeofreport', r.timeofreport)
-    s.set('LastName', current.get('FirstName') || authUser.given_name)
-    s.set('FirstName', current.get('LastName') || authUser.family_name)
-    s.set('longitude1', r.address.geometry.coordinates[0].toString())
-    s.set('latitude1', r.address.geometry.coordinates[1].toString())
-    s.set('latitude', r.address.geometry.coordinates[0])
-    s.set('longitude', r.address.geometry.coordinates[1])
+    s.set('LastName', user.firstName)
+    s.set('FirstName', user.lastName)
+    s.set('longitude1', r.address.geometry.coordinates[0])
+    s.set('latitude1', r.address.geometry.coordinates[1])
+    s.set('latitude', r.address.geometry.coordinates[1].toString())
+    s.set('longitude', r.address.geometry.coordinates[0].toString())
     s.set('can_be_shared', true)
     s.set('typeofreport', 'complaint')
     s.set('loc1_address', r.address.properties.label)
     s.set('reportDescription', r.reportDescription)
     s.set('testify', true)
     s.set('operating_system', 'web')
-    s.set('Phone',current.get('Phone'))
+    s.set('Phone', user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)
-
+    if(user.phone && user.phone != current.get('Phone')) {
+        current.set('Phone', user.phone)
+        await current.save()
+    }
     let index = 0
     if(r.files.length>2) {
         throw Error("Too Many Files")
     }
-    throw Error("ok we have gone far enough")
+
     for(const file of r.files) {
         const f = new Parse.File(file.name, file);
         const photo = await f.save()
@@ -107,7 +116,7 @@ export const submitReport = async (r:Report) => {
     const result = await s.save()
 }
 
-export const login = async (response:any, onAlreadyExists:(accessToken:string,decoded:JwtPayload)=>void):Promise<User> => {
+export const login = async (response:any, onAlreadyExists:(accessToken:string,decoded:JwtPayload)=>void):Promise<User|undefined> => {
     const accessToken = response.credential
     const current = await Parse.User.current()
     const decoded = jwtDecode(accessToken);
@@ -130,11 +139,11 @@ export const login = async (response:any, onAlreadyExists:(accessToken:string,de
             loggedInUser.set('LastName', decoded.family_name)
         }
         await loggedInUser.save()
-        userLogin.next(loggedInUser)
+        userLogin.next(toUser(loggedInUser))
         return loggedInUser
     } catch(e) {
         if(e.code==202) {
-            onAlreadyExists(accessToken, decoded)
+            onAlreadyExists(accessToken, decoded)            
         } else {
             console.log(e)
             throw e
@@ -149,7 +158,17 @@ export const forgotEmail = async (email:string):Promise<any> => {
 
 export const isLoggedIn = async():Promise<User | undefined> => {
     const user = await Parse.User.current()
-    return user
+    return user && toUser(user)
+}
+
+function toUser(user:Parse.User): User {
+    return {
+        firstName: user.get('FirstName'),
+        lastName: user.get('LastName'),
+        phone: user.get('Phone'),
+        email: user.get('email'),
+        id: user.id
+    } as User
 }
 
 export const logout = async():Promise<any> => {

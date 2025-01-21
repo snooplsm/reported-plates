@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import Box from '@mui/material/Box';
 import 'leaflet/dist/leaflet.css';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import {GeoSearchAutocomplete} from './api/ny/nyc/GeoSearchAutocomplete';
 
 type MapProps = {
@@ -108,6 +110,7 @@ export const MapPickerView = ({ latLng, location }:MapProps) => {
         })
     }
 
+    const loc = centerLocation || location
     return (
         <>
             <GeoSearchAutocomplete onChange={onSearchChange} initial={initial} />
@@ -131,6 +134,7 @@ export const MapPickerView = ({ latLng, location }:MapProps) => {
                     <DraggableMarker center={center} onDragEnd={onDragEnd}>
                         <Popup>
                             {centerLocation && <>{centerLocation.features[0].properties.label}<br /><br /></>}
+                            {location && <>{location.features[0].properties.label}<br /><br /></>}
                             {center[0].toFixed(4)},{center[1].toFixed(4)}
                         </Popup>
                     </DraggableMarker>

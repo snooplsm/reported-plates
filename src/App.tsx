@@ -6,7 +6,7 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography, Avatar, Card, CardActionArea } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
@@ -23,8 +23,9 @@ import { BasicDateTimePicker } from './BasicDateTimePicker';
 import { MapPickerView } from './MapPickerView';
 import { JwtPayload } from 'jwt-decode';
 import LoginModal from './LoginModal';
-import { isLoggedIn, login, Report, ReportErrors, ReportError, submitReport, userLogin, userLogout } from './Auth';
+import { isLoggedIn, login, Report, ReportErrors, ReportError, userLogin, userLogout, User } from './Auth';
 import TextArea from './TextArea';
+import { SubmissionPreview } from './SubmissionPreview';
 
 
 function App() {
@@ -35,7 +36,7 @@ function App() {
 
   const [files, setFiles] = useState(new Set<File>())
   const [currentFile, setCurrentFile] = useState<number>()
-  const [fileNames] = useState<Set<string>>(new Set())
+  const [fileNames, setFileNames] = useState<Set<string>>(new Set())
 
   const [complaint, setComplaint] = useState<Complaint>()
 
@@ -51,7 +52,7 @@ function App() {
 
   const [showLoginModal, setShowLoginModal] = useState<[string, JwtPayload]>()
 
-  const [isSignedIn, setIsSignedIn] = useState(false)
+  const [isSignedIn, setIsSignedIn] = useState<User>()
 
   const [dateOfIncident, setDateOfIncident] = useState<Date>()
 
@@ -62,25 +63,31 @@ function App() {
   const [dragComponent, setDragComponent] = useState<HTMLElement>()
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  useEffect(()=> {
-    const loginSub = userLogin.subscribe(()=> {
-      setIsSignedIn(true)
+
+  const [reportPreview, setReportPreview] = useState<Report>()
+
+  const [showReportPreview, setShowReportPreview] = useState(false)
+
+  const [reportError, setReportError] = useState<Set<ReportError>>()
+
+  useEffect(() => {
+    const loginSub = userLogin.subscribe((user) => {
+      setIsSignedIn(user)
     })
-    const logoutSub = userLogout.subscribe(()=> {
-      setIsSignedIn(false)
+    const logoutSub = userLogout.subscribe(() => {
+      setIsSignedIn(undefined)
     })
     return () => {
       loginSub.unsubscribe()
       logoutSub.unsubscribe()
     }
-  },[])
+  }, [])
 
-  const onPlate = (plates: PlateDetection) => { 
-    if(!plate) {
+  const onPlate = (plates: PlateDetection) => {
+    if (!plate) {
       setPlate(plates)
     }
-    if(plate) {
+    if (plate) {
       plate.state = plates.state
       plate.text = plates.text
       plate.plateOverride = plates.plateOverride
@@ -108,7 +115,7 @@ function App() {
   useEffect(() => {
     const signedIn = async () => {
       const user = await isLoggedIn()
-      setIsSignedIn(user != undefined)
+      setIsSignedIn(user)
     }
     signedIn()
   }, [])
@@ -165,20 +172,91 @@ function App() {
     setLoaded(true)
   }
 
+  const getReport = () => {
+    const err: Set<ReportErrors> = new Set()
+    let license: string | undefined
+    let state: string | undefined
+    if (!plate) {
+      err.add(ReportErrors.MISSING_PLATE)
+    } else {
+      license = plate?.plateOverride?.trim() ? plate.plateOverride : plate?.text
+      if (!license) {
+        err.add(ReportErrors.MISSING_PLATE)
+      }
+
+      state = plate?.state
+      if (!state) {
+        err.add(ReportErrors.MISSING_PLATE_STATE)
+      }
+    }
+
+    const fileZ = files
+    if ((!fileZ || (files.size || 0) < 1)) {
+      err.add(ReportErrors.NO_PHOTOS)
+    }
+
+    const timeofreport = dateOfIncident
+    if (!timeofreport) {
+      err.add(ReportErrors.MISSING_DATE)
+    }
+
+    const addy = location?.features[0]
+
+    if (!addy) {
+      err.add(ReportErrors.MISSING_ADDRESS)
+    }
+
+
+    const latLng = location?.features[0].geometry
+    if (!latLng) {
+      err.add(ReportErrors.MISSING_ADDRESS)
+    }
+
+    const _complaint = complaint
+
+    if (!_complaint) {
+      err.add(ReportErrors.MISSING_COMPLAINT)
+    }
+
+    const user = isSignedIn
+    if (user == undefined) {
+      err.add(ReportErrors.NOT_LOGGED_IN)
+    }
+
+    if (err.size > 0) {
+      setReportError(err)
+      return
+    } else {
+      setReportError(undefined)
+    }
+    return {
+      license: license!,
+      state: state!,
+      files: [...fileZ]!,
+      timeofreport: timeofreport!,
+      address: addy!,
+      reportDescription: reportDescription.trim(),
+      testify: true,
+      passenger: false,
+      typeofcomplaint: complaint?.type!,
+      user: user!
+    } as Report
+  }
+
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
     if (filez) {
       const newFiles = new Set<File>(files)
-      filez.forEach(file=> {
-        if(!fileNames.has(file.name)) {
+      filez.forEach(file => {
+        if (!fileNames.has(file.name)) {
           newFiles.add(file)
         }
       })
       setFiles(newFiles)
-      if(currentFile == undefined) {
+      if (currentFile == undefined) {
         setCurrentFile(0)
       }
     }
-    if(complaint) {
+    if (complaint) {
       setComplaint(complaint)
     }
 
@@ -225,7 +303,6 @@ function App() {
       segment(file)
         .then(result => {
           console.log("segmented file")
-          result
           if (result) {
             const carWithPlates = result.filter(res => res.plate != null)
             setResults(carWithPlates)
@@ -241,18 +318,24 @@ function App() {
         }).catch(error => {
           console.log(error)
         })
-        exifGetter(file).then(ok => {
-          
+      exifGetter(file).then(ok => {
+
       })
     }
   }
-
+  let step = 1
   return (
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <Box width="100%"><UserView isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
         display="flex"
+        sx={{
+          "& > *": {
+            margin: 1, // Apply margin to all children
+          },
+        }}
         height="100vh"
       >
         {/* Left Column */}
@@ -262,141 +345,179 @@ function App() {
           flexDirection="column"
           justifyContent="start"
           sx={{
-            // overflowY: "auto"
+            "& > *": {
+              marginTop: 1, // Apply margin to all children
+            },
+            "& > *:first-child": {
+              marginTop: 0, // Apply margin to all children
+            },
           }}
         >
-          <UserView isSignedIn={isSignedIn} handleSuccess={handleSuccess} handleError={handleError} />
-          <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} selectedComplaint={complaint} onChange={setComplaint} />
+          <Paper sx={{ width: "100%", position: "relative" }}>
+            <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} selectedComplaint={complaint} onChange={(complaint) => {
+              setComplaint(complaint)
+            }
+            } />
+            <Box
+              sx={{
+                position: "absolute",
+                top: -20,
+                left: 5
+              }}
+            ><Avatar sx={{
+              bgcolor: "rgb(250,221,152)",
+              color: "rgb(0,0,0)",
+              boxShadow: 3,
+              fontSize: "90%"
+
+            }}>{step++} & {step++}</Avatar></Box>
+          </Paper>
           <Box sx={{
             position: "relative",
-            maxHeight: "80px",
             height: "auto",
-            width: "100%",
-            overflow: "hidden"
+            padding: .5,
+            width: "100%", overflow: "display",
           }}>
-            {[...(files||[])].map((x,index) => {
-              return <FileUploadPreview onClick={()=>{              
-                setCurrentFile(index)}} file={x} />
+            {[...(files || [])].map((x, index) => {
+              return <FileUploadPreview onClick={() => {
+                setCurrentFile(index)
+              }} file={x} onClickDelete={() => {
+                setFiles((files) => {
+                  fileNames.delete(x.name)
+                  files.delete(x)
+                  return new Set(files)
+                })
+              }} />
             })}
           </Box>
-          <DetectionView onPlateChange={onPlate} plate={plate} />
-
-          <Box sx={{
-            position: "absolute",
-            bottom: 0,
+          <Paper sx={{
+            width: "100%",
           }}>
-            <Button
-              sx={{
-                width: "100%",
-                margin: 2
-              }}
-              size='large'
-              onClick={() => {
-                
-                const err:ReportErrors[] = []
-                let license:string | undefined
-                let state:string | undefined
-                if(!plate) {
-                  err.push(ReportErrors.MISSING_PLATE)
-                } else {
-                  license = plate?.plateOverride?.trim() ? plate.plateOverride : plate?.text
-                  if(!license) {
-                    err.push(ReportErrors.MISSING_PLATE)
-                  }
-                  
-                  state = plate?.state
-                  if(!state) {
-                    err.push(ReportErrors.MISSING_PLATE_STATE)
-                  }
-                }
-                
-                const fileZ = files
-                if((!fileZ || (files.size || 0) < 1)) {
-                  err.push(ReportErrors.NO_PHOTOS)
-                }
+            <Box sx={{
+              position: "relative",
+              padding: 2
+            }}>
+              <Box sx={{
+                // marginLeft: 2
+              }}>
+                <DetectionView onPlateChange={onPlate} plate={plate} />
+              </Box>
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -20,
+                  left: 5,
+                  zIndex: 10,
+                }}
+              ><Avatar sx={{
+                bgcolor: "rgb(250,221,152)",
+                color: "rgb(0,0,0)",
+                boxShadow: 3
+              }}>{step++}</Avatar></Box>
+            </Box>
+          </Paper>
 
-                const timeofreport = dateOfIncident
-                if(!timeofreport) {
-                  err.push(ReportErrors.MISSING_DATE)
-                }
+          <Paper sx={{
+            overflow: "display",
+            marginTop: 3,
+            position: "relative"
+          }}>
+            <CardActionArea>
+                <Typography
+                  sx={{
+                    margin: 2,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    color: theme.palette.primary.main
+                  }}
+                  size='large'
+                  onClick={async () => {
 
-                const addy = location?.features[0]
-                
-                if(!addy) {
-                  err.push(ReportErrors.MISSING_ADDRESS)
-                }
+                    const report = getReport()
 
-              
-                const latLng = location?.features[0].geometry
-                if(!latLng) {
-                  err.push(ReportErrors.MISSING_ADDRESS)
-                }
-
-                const _complaint = complaint
-
-                if(!_complaint) {
-                  err.push(ReportErrors.MISSING_COMPLAINT)
-                }
-
-                if(err.length>0) {
-                  throw ReportError(err)
-                }
-
-                const report:Report = {
-                  license: license!,
-                  state: state!,
-                  files: [...fileZ]!,
-                  timeofreport: timeofreport!,
-                  address: addy!,
-                  reportDescription: '',
-                  testify: true,
-                  passenger: false,
-                  typeofcomplaint: complaint?.type!
-                }
-                console.log(report)
-                setSubmitting(true)
-                submitReport(report)
-                .then(result=> {
-                  setSubmitting(false)
-                  console.log("success", result)
-                }).catch(error=> {
-                  setSubmitting(false)
-                  console.log(error)
-                })
-              }}
-              endIcon={<SendIcon />}
-              loading={submitting}
-              loadingPosition="end"
-              variant="contained"
-            >
-              Submit Complaint
-            </Button>
-          </Box>
+                    console.log(report)
+                    setSubmitting(true)
+                    setReportPreview(report)
+                    setShowReportPreview(true)
+                  }}
+                >
+                  VERIFY & SUBMIT
+                </Typography>
+                </CardActionArea>
+              <Box sx={{
+                position: "absolute",
+                top: -20,
+                left: 5,
+                zIndex: 20
+              }}><Avatar sx={{
+                bgcolor: "rgb(250,221,152)",
+                color: "rgb(0,0,0)",
+                boxShadow: 3,
+              }}>{step+1}</Avatar></Box>
+          </Paper>
         </Box>
         {/* Right Column */}
         <Box
           flex="0 0 50%"
           display="flex"
+          sx={{
+            "& > *": {
+              marginTop: 1, // Apply margin to all children
+            },
+            "& > *:first-child": {
+              marginTop: 0, // Apply margin to all children
+            }
+          }}
         >
-          {(currentFile==undefined) &&
+          {(currentFile == undefined) &&
             <HowToGuide onStepHovered={(step) => {
               setHoveredStep(step)
             }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
-          {currentFile && <DetectView file={[...files][currentFile]} />}
+          {currentFile != undefined && currentFile >= 0 &&
+            <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
+              setResults(result)
+              setBoxes(result)
+              setCar(car)
+              setPlate(car.plate!)
+            }} />
+          }
         </Box>
-        <Box flex="1" sx={{
-          marginTop: 1,
-          marginRight: 1,
-        }}>
-          <MapPickerView latLng={latLng} location={location} />
-          <BasicDateTimePicker onChange={(value) => {
-            setDateOfIncident(value)
-          }} value={dateOfIncident} />
+        <Box
+          flex="1"
+          sx={{
+            "& > *": {
+              marginTop: 1, // Apply margin to all children
+            },
+            "& > *:first-child": {
+              marginTop: 0, // Apply margin to all children
+            }
+          }
+          }
+        >
+          <Paper sx={{
+            padding: 1,
+            paddingTop: 3,
+            position: "relative"
+          }}>
+            <MapPickerView latLng={latLng} location={location} />
+            <BasicDateTimePicker onChange={(value) => {
+              setDateOfIncident(value)
+            }} value={dateOfIncident} />
 
-          <TextArea
-            value={reportDescription}
-            onChange={setReportDescription}
-          />
+            <TextArea
+              value={reportDescription}
+              onChange={setReportDescription}
+            />
+            <Box sx={{
+              position: "absolute",
+              top: -20,
+              left: 5
+            }}><Avatar sx={{
+              bgcolor: "rgb(250,221,152)",
+              color: "rgb(0,0,0)",
+              boxShadow: 3,
+            }}>{step++}</Avatar></Box>
+          </Paper>
         </Box>
         {showLoginModal &&
           <LoginModal
@@ -411,6 +532,13 @@ function App() {
               setShowLoginModal(undefined)
             }
             } />}
+        {showReportPreview && reportPreview &&
+          <SubmissionPreview
+            onCancel={() => {
+              setShowReportPreview(false)
+            }}
+            open={showReportPreview}
+            report={reportPreview} />}
       </Box>
     </ThemeProvider>
   )

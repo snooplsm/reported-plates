@@ -12,6 +12,7 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
 
   const [color, setColor] = useState(NYSTATE.plate.color)
   const [bgColor, setBgColor] = useState(NYSTATE.plate.bg)
+  const anchorRef = useRef<HTMLElement>(null)
   const [bottomText, setBottomText] = useState("")
   const [bottomTextColor, setBottomTextColor] = useState(NYSTATE.bottom.color)
   const [bottomBgColor, setBottomBgColor] = useState(NYSTATE.bottom.bg)
@@ -94,10 +95,11 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
       >
         <TextField
           variant="standard" // Remove outlined or filled styling
+          placeholder="NONE"
           InputProps={{
             disableUnderline: true, // Disable underline
             sx: {
-              fontSize: "3.8vh",
+              fontSize: "3.2vh",
               fontWeight: 600,  // Remove padding
               textAlign: "center",
               width: "100%",
@@ -134,8 +136,8 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: "1.3vh",
-            width: "25%",
+            top: ".5vh",
+            width: "22%",
             zIndex: 3,
             height: ".15rem", // Adjust thickness
             background: NYSTATE.plate.color
@@ -145,8 +147,8 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: "1.7vh",
-            width: "25%",
+            top: ".8vh",
+            width: "22%",
             zIndex: 3,
             height: ".3rem", // Adjust thickness
             background: NYSTATE.bottom.color
@@ -156,9 +158,9 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
         <Box
           sx={{
             position: 'absolute',
-            top: "1.3vh",
+            top: ".5vh",
             right: 0,
-            width: "25%",
+            width: "22%",
             zIndex: 3,
             height: ".15rem", // Adjust thickness
             background: NYSTATE.plate.color
@@ -170,8 +172,8 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
           sx={{
             position: 'absolute',
             right: 0,
-            top: "1.7vh",
-            width: "25%",
+            top: ".8vh",
+            width: "22%",
             zIndex: 3,
             height: ".3rem", // Adjust thickness
             background: NYSTATE.bottom.color
@@ -179,7 +181,7 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
       </>}
 
       <Box
-        id="plate"
+        id="plate"        
         sx={{
           position: 'relative',
           top: "0",
@@ -192,11 +194,12 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
           background: plateState.top.bg, // Blue color
         }}
       > {true &&<><Tooltip title="Click to change" placement="top"><Typography
+        ref={anchorRef}
         onClick={()=> {
           setMenuOpen(true)
         }}
         sx={{
-          fontSize: "1.2vw",
+          fontSize: "1.33vw",
           color: plateState.top.color,
           height: "100%",
           paddingTop: ".1vh",
@@ -207,7 +210,7 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
           fontWeight: 600,
         }}
       >{plateState.top.text}</Typography></Tooltip></>}
-        {<Menu open={menuOpen} onClose={()=> setMenuOpen(false)}>
+        {<Menu open={menuOpen} anchorEl={anchorRef} onClose={()=> setMenuOpen(false)}>
 
             {states.map((state, index) => <MenuItem onClick={()=> {setPlateState(state); setMenuOpen(false)}} key={`${state.state}_${index}`} value={state}><Typography
               sx={{
@@ -223,7 +226,7 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
       <Box
         sx={{
           position: "absolute", // Positioned at the bottom
-          bottom: "0",
+          bottom: "2%",
           left: "0",
           alignItems: "center",
           justifyContent: "center",
@@ -234,7 +237,7 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
         }}
       ><Typography
         sx={{
-          fontSize: "1.5vh",
+          fontSize: "1.3vh",
           zIndex: 2, // Higher than the lines
           fontWeight: 600,
           color: plateState.bottom.altColor?.(plate?.tlc || false) || bottomTextColor, // Default text color

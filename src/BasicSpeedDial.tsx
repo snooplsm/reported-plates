@@ -4,10 +4,10 @@ import { logout } from './Auth';
 import { useEffect, useRef, useState } from 'react';
 
 export interface SpeedProps {
-  avatarUrl?:string
+  avatarUrl?: string
 }
 
-export const BasicSpeedDial = ({avatarUrl}:SpeedProps) => {
+export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
 
   const anchorRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false);
@@ -39,67 +39,48 @@ export const BasicSpeedDial = ({avatarUrl}:SpeedProps) => {
 
     prevOpen.current = open;
   }, [open]);
-  
+
   return (
-    <Box sx={{ 
-      position: 'relative', // Establishes positioning context for SpeedDial,
-      width: "20px",
-      height: "20px",
-      right: 0
-     }}>
+    <Box sx={{
+    }}>
       <Fab ref={anchorRef} onClick={handleToggle}>
-        <Avatar sx={{width: "100%", height: "100%"}} src={avatarUrl}/>
+        <Avatar src={avatarUrl} />
       </Fab>
       <Popper
-          sx={{
-            zIndex: 7
-          }}
-          open={open}
-          anchorEl={anchorRef.current}
-          role={undefined}
-          placement="bottom-start"
-          transition
-          disablePortal
-        >
-          {({ TransitionProps, placement }) => (
-            <Grow
-              {...TransitionProps}
-              style={{
-                transformOrigin:
-                  placement === 'bottom-start' ? 'left top' : 'left bottom',
-              }}
-            >
-              <Paper>
-                <ClickAwayListener onClickAway={handleClose}>
-                  <MenuList
-                    autoFocusItem={open}
-                    id="composition-menu"
-                    aria-labelledby="composition-button"
-                    // onKeyDown={handleListKeyDown}
-                  >
-                    <MenuItem onClick={handleClose}>My Reports</MenuItem>
-                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                  </MenuList>
-                </ClickAwayListener>
-              </Paper>
-            </Grow>
-          )}
-        </Popper>
-      {/* <SpeedDial
-        ariaLabel="SpeedDial basic example"
-        direction='up'
-        sx={{ position: 'reltive', height: "100",right: 0 }}
-        icon={<Avatar src={avatarUrl}  />}
+        sx={{
+          zIndex: 7
+        }}
+        open={open}
+        anchorEl={anchorRef.current}
+        role={undefined}
+        placement="bottom-start"
+        transition
+        disablePortal
       >
-        {actions.map((action) => (
-          <SpeedDialAction
-            key={action.name}
-            icon={action.icon}
-            onClick={action.onClick}
-            tooltipTitle={action.name}
-          />
-        ))}
-      </SpeedDial> */}
+        {({ TransitionProps, placement }) => (
+          <Grow
+            {...TransitionProps}
+            style={{
+              transformOrigin:
+                placement === 'bottom-start' ? 'left top' : 'left bottom',
+            }}
+          >
+            <Paper>
+              <ClickAwayListener onClickAway={handleClose}>
+                <MenuList
+                  autoFocusItem={open}
+                  id="composition-menu"
+                  aria-labelledby="composition-button"
+                // onKeyDown={handleListKeyDown}
+                >
+                  <MenuItem onClick={handleClose}>My Reports</MenuItem>
+                  <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                </MenuList>
+              </ClickAwayListener>
+            </Paper>
+          </Grow>
+        )}
+      </Popper>
     </Box>
   );
 }

@@ -1,11 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemText, Button } from '@mui/material';
+import { Box, Typography, Paper, List, ListItem, ListItemText, Button, Avatar, Stack } from '@mui/material';
 import { ComplaintsView } from './Complaints';
 import LicensePlate from './LicensePlate';
-import { GoogleLogin } from '@react-oauth/google';
-import {isLoggedIn, login} from "./Auth"
-import LoginModal from './LoginModal';
-import { JwtPayload } from 'jwt-decode';
 
 export enum Steps {
     TAKE_PHOTO,
@@ -83,31 +79,27 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                // justifyContent: 'center',
-                padding: 4,
-                gap: 2,
+                // justifyContent: 'center',                
             }}
         >
-            {/* Title */}
-            <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
-                How to Submit a Vehicle Complaint
-            </Typography>
+
 
             {/* Step-by-Step Guide */}
             <Paper
-                elevation={3}
                 sx={{
                     width: '100%',
                     maxWidth: '800px',
                     padding: 2,
-                    backgroundColor: '#f9f9f9',
                 }}
             >
+            <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
+                How to Submit a Vehicle Complaint
+            </Typography>
                 {/* <Typography variant="h5" >
                     Steps:
                 </Typography> */}
                 <List>
-                    {!isSignedIn && <ListItem
+                    {/* {!isSignedIn && <ListItem
                         onMouseOver={(e) => {
                             e.preventDefault()
                             onStepHovered && onStepHovered(Steps.DRAG_PHOTO_OR_UPLOAD)
@@ -124,7 +116,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 width: "50%",
                                 flexGrow: 1,
                             }}
-                            primary={`${step++}. Sign in`}
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{marginRight: 2}}>{step++}</Avatar>Sign in</Stack>}
                             secondary="Sign in with google."
                         />
                         <Box
@@ -144,7 +136,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                             />
                         </Box>
                     </ListItem>
-                    }
+                    } */}
                     <ListItem
                         onMouseOver={() => onStepHovered && onStepHovered(Steps.TAKE_PHOTO)}
                         onMouseLeave={() => onStepHovered && onStepHovered(undefined)}
@@ -153,7 +145,12 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                             sx={{
                                 width: "50%"
                             }}
-                            primary={`${step++}. Take a photo of the infraction.`}
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
+                                bgcolor: "rgb(250,221,152)",
+                                color: "rgb(0,0,0)",
+                                boxShadow: 3,
+                                marginRight: 2
+                              }}>{step++}</Avatar>Take a photo of the infraction</Stack>}
                             secondary="Be sure to include the vehicle's license plate to take advantage of our license plate reader."
                         />
                         <Box
@@ -167,7 +164,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                         >
                             <video
                                 src={videoUrl}
-                                title="Step 1 Video"
+                                title="Take a photo"
                                 autoPlay={true} loop muted
                                 style={{
                                     top: 0,
@@ -197,7 +194,12 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                             sx={{
                                 width: "50%"
                             }}
-                            primary={`${step++}. Drag the photo over the infractions on the left, or click the infraction and upload the file.`}
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
+                                bgcolor: "rgb(250,221,152)",
+                                color: "rgb(0,0,0)",
+                                boxShadow: 3,
+                                marginRight: 2
+                              }}>{step++}</Avatar>Drag the photo over the infractions on the left, or click the infraction and upload the file.</Stack>}
                             secondary="We support drag-and-drop or manual uploads for your convenience."
                         />
                         <Box
@@ -210,7 +212,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                             }}
                             ref={scrollRef}
                             sx={{
-                                width: "35%",
+                                width: "25%",
                                 position: 'relative',
                                 borderRadius: 4,
                                 overflow: 'auto',
@@ -224,15 +226,21 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                     >
                         <ListItemText
                             sx={{
-                                width: "50%"
+                                width: "50%",
                             }}
-                            primary={`${step++}. Extract key details.`}
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
+                                bgcolor: "rgb(250,221,152)",
+                                color: "rgb(0,0,0)",
+                                boxShadow: 3,
+                                marginRight: 2,
+                                fontSize: "90%"
+                              }}>{step++} & {step++}</Avatar>Extract key details.`</Stack>}
                             secondary="The license plate will be extracted from the photo, along with the location and time of the infraction."
                         />
                         <Box
                             sx={{
                                 position: 'relative',
-                                width: "35%",
+                                width: "30%",
                                 borderRadius: 4,
                                 overflow: 'hidden',
                             }}
@@ -242,8 +250,15 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                     </ListItem>
                     <ListItem onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>
                         <ListItemText
-                            primary={`${step}. Verify and submit.`}
-                            secondary={<ol type="i">
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
+                                bgcolor: "rgb(250,221,152)",
+                                color: "rgb(0,0,0)",
+                                boxShadow: 3,
+                                marginRight: 2
+                              }}>{step++}</Avatar>Verify and submit.</Stack>}
+                            secondary={<ol type="i" style={{
+                                marginLeft: 32
+                            }}>
                                 {[
                                     <><b>Complaint Type:</b> Confirm you selected the correct complaint type</>,
                                     <><b>License Plate and State:</b> Verify the license plate and state match the photo, if applicable</>,
@@ -258,7 +273,12 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                     </ListItem>
                     <ListItem>
                         <ListItemText
-                            primary={<>{step}. <a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></>}
+                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
+                                bgcolor: "rgb(250,221,152)",
+                                color: "rgb(0,0,0)",
+                                boxShadow: 3,
+                                marginRight: 2
+                              }}>{step++}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
                             secondary={
                                 <>
                                 Our slack channel is a great resource to learn the process of filing complaints with the TL&C
