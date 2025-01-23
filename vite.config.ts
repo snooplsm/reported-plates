@@ -28,7 +28,7 @@ export default defineConfig({
           dest: './'
         },
         {
-          src: 'leaflet/dist/images/*.png',
+          src: 'node_modules/leaflet/dist/images/*.png',
           dest: './'
         }
       ]
