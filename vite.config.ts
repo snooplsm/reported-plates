@@ -26,6 +26,10 @@ export default defineConfig({
         {
           src: 'node_modules/onnxruntime-web/dist/*.wasm',
           dest: './'
+        },
+        {
+          src: 'leaflet/dist/images/*.png',
+          dest: './'
         }
       ]
     })

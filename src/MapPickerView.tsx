@@ -5,7 +5,9 @@ import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import Box from '@mui/material/Box';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import {Icon} from 'leaflet'
 import {GeoSearchAutocomplete} from './api/ny/nyc/GeoSearchAutocomplete';
 
 type MapProps = {
@@ -46,6 +48,7 @@ const DraggableMarker = ({ center, children, onDragEnd }: MarkerProps) => {
         <Marker
             draggable={draggable}
             eventHandlers={eventHandlers}
+            icon={new Icon({iconUrl: markerIcon, iconRetinaUrl: markerIconRetina, shadowUrl: markerShadow, iconSize: [25, 41], iconAnchor: [12, 41]})} 
             position={position}
             ref={markerRef}>
             {children}
@@ -151,7 +154,7 @@ export const MapPickerView = ({ latLng, location, onLocationChange = (location:G
                     />
                     <DraggableMarker center={center} onDragEnd={onDragEnd}>
                         <Popup>
-                            {centerLocation && <>{centerLocation.features[0].properties.label}<br /><br /></>}
+                            {centerLocation && !location && <>{centerLocation.features[0].properties.label}<br /><br /></>}
                             {location && <>{location.features[0].properties.label}<br /><br /></>}
                             {center[0].toFixed(4)},{center[1].toFixed(4)}
                         </Popup>
