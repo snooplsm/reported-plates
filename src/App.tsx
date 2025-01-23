@@ -223,7 +223,6 @@ function App() {
     if (user == undefined) {
       err.add(ReportErrors.NOT_LOGGED_IN)
     }
-
     if (err.size > 0) {
       setReportError(err)
       return
@@ -362,7 +361,7 @@ function App() {
             },
           }}
         >
-          <Paper sx={{ width: "100%", position: "relative" }}>
+          <Paper sx={{ width: "100%", position: "relative", paddingTop: 3 }}>
             <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} selectedComplaint={complaint} onChange={(complaint) => {
               setComplaint(complaint)
             }
@@ -411,7 +410,8 @@ function App() {
           }}>
             <Box sx={{
               position: "relative",
-              padding: 2
+              padding: 2,
+              paddingTop: 3
             }}>
               <Box sx={{
                 // marginLeft: 2
@@ -426,12 +426,14 @@ function App() {
           <Paper sx={{
             overflow: "display",
             marginTop: 3,
+            padding: 3,
             position: "relative"
           }}>
-            <CardActionArea>
+            <CardActionArea sx={{
+              flex: 1
+            }}>
                 <Typography
                   sx={{
-                    margin: 2,
                     fontWeight: 700,
                     textAlign: "center",
                     color: theme.palette.primary.main
@@ -441,7 +443,6 @@ function App() {
 
                     const report = getReport()
 
-                    console.log(report)
                     setSubmitting(true)
                     setReportPreview(report)
                     setShowReportPreview(true)
@@ -450,7 +451,7 @@ function App() {
                   VERIFY & SUBMIT
                 </Typography>
                 </CardActionArea>
-              <StepView hasError={reportError && reportError.size>0}>{step+1}</StepView>
+              <StepView hasError={undefined}>{step+2}</StepView>
           </Paper>
         </Box>
         {/* Right Column */}
@@ -493,21 +494,35 @@ function App() {
         >
           <Paper sx={{
             padding: 1,
-            paddingTop: 3,
+            paddingTop: 3.5,
             position: "relative"
           }}>
-            <MapPickerView latLng={latLng} location={location} />
+            <MapPickerView latLng={latLng} location={location} onLocationChange={(location) => {
+              setLatLng([location?.features[0].geometry.coordinates[1], location?.features[0].geometry.coordinates[0]])
+              setLocation(location)
+            }} />        
+            <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_ADDRESS)}>
+              {step++}
+            </StepView>    
+        </Paper>
+        <Paper sx={{
+          marginTop: 3,
+            position: "relative",
+            padding: 1,
+            paddingTop: 2
+            
+        }}>
             <BasicDateTimePicker onChange={(value) => {
               setDateOfIncident(value)
             }} value={dateOfIncident} />
-
+            <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_DATE)}>
+              {step++}
+            </StepView>
             <TextArea
               value={reportDescription}
               onChange={setReportDescription}
             />
-            <StepView hasError={reportError && reportError.has(ReportError.MISSING_ADDRESS)}>
-              {step++}
-            </StepView>
+
           </Paper>
         </Box>
         {showLoginModal &&

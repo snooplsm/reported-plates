@@ -69,7 +69,7 @@ export interface Report {
 
 
 
-export const submitReport = async (r:Report) => {
+export const submitReport = async (r:Report, phone?:string) => {
     const current = await Parse.User.current()
     if(!current) {
         throw Error("Not Logged In")
@@ -77,7 +77,7 @@ export const submitReport = async (r:Report) => {
     const Submission = Parse.Object.extend("submission")
     const s = new Submission();
     const user = r.user
-    const lic = 'TEST'
+    const lic = r.license
     s.set('license', lic)
     s.set('state', r.state)
     s.set('medallionNo', lic)
@@ -99,9 +99,10 @@ export const submitReport = async (r:Report) => {
     s.set('Phone', user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)
-    if(user.phone && user.phone != current.get('Phone')) {
-        current.set('Phone', user.phone)
+    if(phone != current.get('Phone')) {
+        current.set('Phone', phone)
         await current.save()
+        userLogin.next(current)
     }
     let index = 0
     if(r.files.length>2) {
@@ -169,7 +170,8 @@ export interface SimpleReport {
     typeofcomplaint: ComplaintType
     files: string[]
     loc1_address: string
-    location: number[]
+    location: number[],
+    reportDescription: string
 }
 
 const transformSubmission = (p:Parse.Object): SimpleReport => {
@@ -183,6 +185,7 @@ const transformSubmission = (p:Parse.Object): SimpleReport => {
         loc1_address: p.get('loc1_address'),
         reqnumber: p.get("reqnumber") || '',
         location: [loc.latitude, loc.longitude  ],
+        reportDescription: p.get("reportDescription"),
         files: [p.get('photoData0'),p.get('photoData1'),p.get('PhotoData3')].filter(x=>x!=null).map(x=>x.url())
     } as SimpleReport
 }

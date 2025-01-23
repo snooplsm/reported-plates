@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import ReportsTable from "./ReportsTable";
 import { querySubmissions, SimpleReport } from "./Auth";
 import moment from "moment";
+import { ReportView } from "./ReportView";
 
 export const Reports = () => {
 
@@ -15,6 +16,8 @@ export const Reports = () => {
   const [start, setStart] = useState<Date>()
   const [end, setEnd] = useState<Date>()
   const [reports, setReports] = useState<SimpleReport[]>()
+
+  const [selectedReport, setSelectedReport] = useState<SimpleReport>()
 
 
   useEffect(() => {
@@ -28,16 +31,20 @@ export const Reports = () => {
   },[])
 
   useEffect(() => {
-    const start = new Date()
-    start.setFullYear(2018)
-    start.setHours(0,0,0,0)
-    querySubmissions({
-      license: '',
-      reqNumber: ''
-    }).then(result=> {
-        setReports(result)
-    }).catch(console.log)
-  }, [])
+    const handler = setTimeout(() => {
+      querySubmissions({
+        license: license.trim(),
+        reqNumber: three.trim(),
+        startDate: start,
+        endDate: end
+      }).then(result=> {
+          setReports(result)
+      }).catch(console.log)
+    }, 400); // 500ms debounce time
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [three, license, start, end])
 
   return (
     <ThemeProvider theme={theme}>
@@ -96,8 +103,9 @@ export const Reports = () => {
     }}
     height="100vh"
   >    
-    <ReportsTable reports={reports} />
+    <ReportsTable reports={reports} onReportClicked={(report)=> setSelectedReport(report)}/>
   </Box>
+  {selectedReport && <ReportView onCancel={()=>setSelectedReport(undefined)} open={selectedReport!=undefined} report={selectedReport}/>}
 </ThemeProvider>
   )
 };

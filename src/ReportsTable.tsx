@@ -43,24 +43,23 @@ const columns: GridColDef[] = [
     }
 ];
 
-const rows = [
-    { id: 'a', reqnumber: '311-12345abcd', license: 'T048385C:NY', loc1_address: '200 Bleecker St, New York, NY 11201', timeofreport: new Date(), files: [] },
-];
-
 const paginationModel = { page: 0, pageSize: 5 };
 
 interface ReportProps {
     reports?: SimpleReport[]
+    onReportClicked?: (report:SimpleReport) => void
 }
 
-export default function ReportsTable({ reports }: ReportProps) {
+export default function ReportsTable({ reports, onReportClicked = (report) => {} }: ReportProps) {
     return (
-        <Paper sx={{ height: 400, width: '100%' }}>
+        <Paper sx={{ height: "70%", width: '100%' }}>
             <DataGrid
-                rows={reports || rows}
+            onCellClick={(cell)=> {                
+                onReportClicked(cell.row as SimpleReport)
+            }}
+                rows={reports || []}
                 columns={columns}
                 initialState={{ pagination: { paginationModel } }}
-                pageSizeOptions={[5, 10]}
                 checkboxSelection
                 sx={{ border: 0 }}
             />

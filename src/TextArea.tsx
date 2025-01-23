@@ -62,7 +62,7 @@ export default function MinHeightTextarea({value, onChange}:TextProps) {
 
   return (
     <Box sx={{
-      padding: 2
+      // padding: 
     }}>
     <Textarea sx={{
       width: "100%",

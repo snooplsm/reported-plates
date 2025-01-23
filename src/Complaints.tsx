@@ -186,8 +186,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
   }, [hoveredIndex, selectedIndex])
 
   return (
-    <Box position="relative">
-      <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>
+    <Box position="relative">      
       <input
         ref={inputRef}
         accept="image/jpeg, image/heic"
@@ -314,6 +313,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
           </Paper>
         </Box>
       </Box>
+      {showCaption && <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>}
       {showCaption && <Typography sx={{ top: 0, fontSize: ".75rem", paddingLeft: ".2rem", paddingRight: ".2rem" }}>Left-to-Right and Top-to-Bottom: <u>Blocked bike lane</u>, <u>crosswalk</u>, <u>ran red light</u>, <u>drove recklessly</u>, <u>illegal parking</u>.</Typography>}
     </Box>
   );

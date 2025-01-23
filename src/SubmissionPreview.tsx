@@ -1,4 +1,4 @@
-import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Dialog, DialogContent, TextField, Typography } from "@mui/material"
+import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Dialog, DialogContent, Modal, TextField, Typography } from "@mui/material"
 import { Report, submitReport } from "./Auth"
 import { useEffect, useState } from "react"
 import moment from "moment";
@@ -95,9 +95,14 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
 
     }, [report])
 
-    return (<Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogContent>
-            <Card>
+    return (<Modal open={open} onClose={onCancel} >
+            <Card sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                maxWidth: "35%",
+                transform: "translate(-50%, -50%)", // Centers the moda
+            }}>
                 <CardHeader
                     // avatar={
                     //   <Avatar sx={{ bgcolor: red[500] }} aria-label="recipe">
@@ -160,16 +165,20 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
                 <CardActions disableSpacing>
                     <Button
                         onClick={()=> {
-                            const phoneNumber = phone || report.user.phone
-                            if(!isValidPhoneNumber) {
+                            if(submitting) {
+                                return
+                            }
+                            const phoneNumber = phone || report.user.phone || ''
+                            if(!isValidPhoneNumber(phoneNumber)) {
                                 setPhoneError(true)
                             } else {
                                 setPhoneError(false)
                             }
                             setSubmitting(true)
-                            submitReport(report)
+                            submitReport(report, phone)
                             .then(result=> {
                                 setSubmitting(false)
+                                window.location.reload()
                             }).catch(err=> {
                                 setSubmitting(false)
                             })
@@ -185,8 +194,7 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
                     </Button>
                 </CardActions>
             </Card>
-        </DialogContent>
-    </Dialog>
+        </Modal>
     )
 
 }

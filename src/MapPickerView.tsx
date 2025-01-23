@@ -10,7 +10,8 @@ import {GeoSearchAutocomplete} from './api/ny/nyc/GeoSearchAutocomplete';
 
 type MapProps = {
     latLng?: number[],
-    location?: GeoSearchResponse
+    location?: GeoSearchResponse,
+    onLocationChange?: (location:GeoSearchResponse)=> void
 };
 
 type MarkerProps = {
@@ -52,7 +53,7 @@ const DraggableMarker = ({ center, children, onDragEnd }: MarkerProps) => {
     )
 }
 
-export const MapPickerView = ({ latLng, location }:MapProps) => {
+export const MapPickerView = ({ latLng, location, onLocationChange = (location:GeoSearchResponse) => {} }:MapProps) => {
 
     const [center, setCenter] = useState([40.76, -73.99])
     const [centerLocation, setCenterLocation] = useState<GeoSearchResponse>()
@@ -83,13 +84,29 @@ export const MapPickerView = ({ latLng, location }:MapProps) => {
         }
     }, [])
 
+    useEffect(()=> {
+        if(initial) {
+            onLocationChange(initial)
+        }
+    },[initial])
+
+    useEffect(()=> {
+        if(centerLocation) {
+            onLocationChange(centerLocation)
+        }
+    }, [centerLocation])
+
     const onSearchChange = (resp: GeoSearchResponse, value: Feature) => {
         const reverse = [value.geometry.coordinates[1], value.geometry.coordinates[0]]
         setCenter(reverse)
 
         const resp2 = { ...resp }
         resp2.features = [value]
+        if(centerLocation!=resp2) {
+            onLocationChange(resp2)
+        }
         setCenterLocation(resp2)
+        
         setInitial(resp2)
         map.setView(reverse, map.getZoom());
     }
@@ -107,6 +124,7 @@ export const MapPickerView = ({ latLng, location }:MapProps) => {
         fetch()
         .then(ok=> {
             setInitial(ok)
+
         })
     }
 

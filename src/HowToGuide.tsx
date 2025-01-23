@@ -199,8 +199,8 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step++}</Avatar>Drag the photo over the infractions on the left, or click the infraction and upload the file.</Stack>}
-                            secondary="We support drag-and-drop or manual uploads for your convenience."
+                              }}>{step++}</Avatar>Add photos</Stack>}
+                            secondary="We support drag-and-drop or manual uploads for your convenience.  Drag an image over the complaint."
                         />
                         <Box
                             onMouseOver={() => {
@@ -234,7 +234,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 boxShadow: 3,
                                 marginRight: 2,
                                 fontSize: "90%"
-                              }}>{step++} & {step++}</Avatar>Extract key details.`</Stack>}
+                              }}>{step++} - {(step+=1)}</Avatar>Extract key details</Stack>}
                             secondary="The license plate will be extracted from the photo, along with the location and time of the infraction."
                         />
                         <Box
@@ -255,7 +255,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step++}</Avatar>Verify and submit.</Stack>}
+                              }}>{step+=1}</Avatar>Verify and submit.</Stack>}
                             secondary={<ol type="i" style={{
                                 marginLeft: 32
                             }}>
@@ -278,7 +278,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step++}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
+                              }}>{step+=1}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
                             secondary={
                                 <>
                                 Our slack channel is a great resource to learn the process of filing complaints with the TL&C
