@@ -1,7 +1,8 @@
 import Box from '@mui/material/Box';
-import { Avatar, ClickAwayListener, Fab, Grow, MenuItem, MenuList, Paper, Popper } from '@mui/material';
+import { Avatar, ClickAwayListener, Fab, Grow, Link, MenuItem, MenuList, Paper, Popper } from '@mui/material';
 import { logout } from './Auth';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export interface SpeedProps {
   avatarUrl?: string
@@ -40,6 +41,8 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
     prevOpen.current = open;
   }, [open]);
 
+  const nav = useNavigate()
+
   return (
     <Box sx={{
     }}>
@@ -65,7 +68,9 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
                 placement === 'bottom-start' ? 'left top' : 'left bottom',
             }}
           >
-            <Paper>
+            <Paper sx={{
+              zIndex: 100
+            }}>
               <ClickAwayListener onClickAway={handleClose}>
                 <MenuList
                   autoFocusItem={open}
@@ -73,7 +78,14 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
                   aria-labelledby="composition-button"
                 // onKeyDown={handleListKeyDown}
                 >
-                  <MenuItem onClick={handleClose}>My Reports</MenuItem>
+                  <MenuItem onClick={(event)=> {
+                    handleClose(event)
+                    nav('/')
+                  }}>New Report</MenuItem>
+                  <MenuItem onClick={(event)=> {
+                    handleClose(event)
+                    nav('/reports')
+                  }}>My Reports</MenuItem>
                   <MenuItem onClick={handleLogout}>Logout</MenuItem>
                 </MenuList>
               </ClickAwayListener>

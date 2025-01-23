@@ -2,6 +2,7 @@ import { GoogleLogin } from "@react-oauth/google"
 import { useEffect, useState } from "react"
 import { BasicSpeedDial } from "./BasicSpeedDial"
 import { Box } from "@mui/material"
+import { useNavigate, useRoutes } from "react-router-dom"
 
 export interface UserProps {
     isSignedIn: boolean
@@ -11,7 +12,9 @@ export interface UserProps {
 
 export const UserView = ({ isSignedIn, handleSuccess, handleError }: UserProps) => {
 
-    const [avatar, setAvatar] = useState<string>('')
+    const [avatar, setAvatar] = useState<string>('')    
+
+    const nav = useNavigate()
 
     useEffect(() => {
         if (isSignedIn) {
@@ -39,7 +42,14 @@ export const UserView = ({ isSignedIn, handleSuccess, handleError }: UserProps) 
             borderRadius: 3,
             objectFit: "contain",
             flexShrink: 0,
-        }} />
+            cursor: "pointer",
+            transition: "transform   0.1s ease", // Smooth hover effect
+          "&:hover": {
+            transform: "scale(1.09)", // Scale image on hover        
+            cursor: "pointer"
+          }
+        }} onClick={()=> nav('/')}
+        />
         <Box sx={{ width: "1%" }}>
         </Box>
         <Box

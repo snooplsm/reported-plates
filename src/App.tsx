@@ -11,10 +11,10 @@ import theme from './theme';
 import DetectView from './DetectView';
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import { Complaint, ComplaintsView, ComplaintType } from './Complaints';
+import { StepView } from './StepProps';
 import { UserView } from './UserView'
 import { DetectionView } from './DetectionView';
 import FileUploadPreview from './FileUploadPreview';
-import SendIcon from '@mui/icons-material/Send';
 import HowToGuide, { Steps } from './HowToGuide';
 import 'react-datetime-picker/dist/DateTimePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -26,6 +26,7 @@ import LoginModal from './LoginModal';
 import { isLoggedIn, login, Report, ReportErrors, ReportError, userLogin, userLogout, User } from './Auth';
 import TextArea from './TextArea';
 import { SubmissionPreview } from './SubmissionPreview';
+import { classifyVehicle } from './classifyVehicle';
 
 
 function App() {
@@ -68,7 +69,7 @@ function App() {
 
   const [showReportPreview, setShowReportPreview] = useState(false)
 
-  const [reportError, setReportError] = useState<Set<ReportError>>()
+  const [reportError, setReportError] = useState<Set<ReportErrors>>()
 
   useEffect(() => {
     const loginSub = userLogin.subscribe((user) => {
@@ -229,7 +230,7 @@ function App() {
     } else {
       setReportError(undefined)
     }
-    return {
+    const report = {
       license: license!,
       state: state!,
       files: [...fileZ]!,
@@ -241,6 +242,14 @@ function App() {
       typeofcomplaint: complaint?.type!,
       user: user!
     } as Report
+    classifyVehicle(license!, state)
+    .then(result=> {
+      report.colorTaxi = result.vehicleType
+      setReportPreview(report)
+    }).catch(e=> {
+      console.log("error on plate lookup")
+    })
+    return report
   }
 
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
@@ -358,23 +367,17 @@ function App() {
               setComplaint(complaint)
             }
             } />
-            <Box
-              sx={{
-                position: "absolute",
-                top: -20,
-                left: 5
-              }}
-            ><Avatar sx={{
-              bgcolor: "rgb(250,221,152)",
-              color: "rgb(0,0,0)",
-              boxShadow: 3,
+            <StepView hasError={reportError && reportError.has(ReportErrors.NO_PHOTOS)} sx={{
               fontSize: "90%"
-
-            }}>{step++} & {step++}</Avatar></Box>
+            }}>{step++} & {step++}</StepView>
           </Paper>
-          <Box sx={{
+          {files.size>0 && <Paper>
+          <Box
+          display="flex"
+           sx={{
             position: "relative",
             height: "auto",
+            
             padding: .5,
             width: "100%", overflow: "display",
           }}>
@@ -383,6 +386,17 @@ function App() {
                 setCurrentFile(index)
               }} file={x} onClickDelete={() => {
                 setFiles((files) => {
+                  let fileIndex = undefined
+                  if(currentFile) {
+                    fileIndex = [...files].indexOf(x)
+                    if(fileIndex<=currentFile) {
+                      fileIndex = Math.max(0,currentFile-1)
+                    }
+                    if(files.size-1 <=0) {
+                      fileIndex = undefined
+                    }
+                  }
+                  setCurrentFile(fileIndex)
                   fileNames.delete(x.name)
                   files.delete(x)
                   return new Set(files)
@@ -390,8 +404,10 @@ function App() {
               }} />
             })}
           </Box>
+          </Paper>}
           <Paper sx={{
             width: "100%",
+            marginTop: 3
           }}>
             <Box sx={{
               position: "relative",
@@ -402,18 +418,8 @@ function App() {
               }}>
                 <DetectionView onPlateChange={onPlate} plate={plate} />
               </Box>
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: -20,
-                  left: 5,
-                  zIndex: 10,
-                }}
-              ><Avatar sx={{
-                bgcolor: "rgb(250,221,152)",
-                color: "rgb(0,0,0)",
-                boxShadow: 3
-              }}>{step++}</Avatar></Box>
+              <StepView hasError={reportError && (reportError.has(ReportErrors.MISSING_PLATE) || reportError.has(ReportErrors.MISSING_PLATE_STATE))}>
+              {step++}</StepView>
             </Box>
           </Paper>
 
@@ -444,16 +450,7 @@ function App() {
                   VERIFY & SUBMIT
                 </Typography>
                 </CardActionArea>
-              <Box sx={{
-                position: "absolute",
-                top: -20,
-                left: 5,
-                zIndex: 20
-              }}><Avatar sx={{
-                bgcolor: "rgb(250,221,152)",
-                color: "rgb(0,0,0)",
-                boxShadow: 3,
-              }}>{step+1}</Avatar></Box>
+              <StepView hasError={reportError && reportError.size>0}>{step+1}</StepView>
           </Paper>
         </Box>
         {/* Right Column */}
@@ -508,15 +505,9 @@ function App() {
               value={reportDescription}
               onChange={setReportDescription}
             />
-            <Box sx={{
-              position: "absolute",
-              top: -20,
-              left: 5
-            }}><Avatar sx={{
-              bgcolor: "rgb(250,221,152)",
-              color: "rgb(0,0,0)",
-              boxShadow: 3,
-            }}>{step++}</Avatar></Box>
+            <StepView hasError={reportError && reportError.has(ReportError.MISSING_ADDRESS)}>
+              {step++}
+            </StepView>
           </Paper>
         </Box>
         {showLoginModal &&

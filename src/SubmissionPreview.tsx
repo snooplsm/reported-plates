@@ -11,6 +11,27 @@ export interface SubmissionProps {
     open: boolean
 }
 
+export function formatCustomDate(date:Date, showAgo = true) {
+    const now = moment();
+    const givenDate = moment(date);
+
+    const daysAgo = now.diff(givenDate, "days");
+    const hoursAgo = now.diff(givenDate, "hours") % 24; // Remaining hours after subtracting days
+
+    const formattedDate = givenDate.format("dddd MMMM Do YYYY [@] h:mma"); // Main date format
+
+    let timeAgo = "";
+    if (showAgo) {
+        if (daysAgo > 0) {
+            timeAgo = `(${daysAgo} days ${hoursAgo} hours ago)`;
+        } else {
+            timeAgo = `(${hoursAgo} hours ago)`;
+        }
+    }
+
+    return `${formattedDate} ${timeAgo}`.trim();
+}
+
 export const SubmissionPreview = ({ report, onClose, onCancel, open }: SubmissionProps) => {
 
     const [images, setImages] = useState<string[]>([])
@@ -40,26 +61,7 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
         return phoneRegex.test(phone);
       }
 
-    function formatCustomDate(date:Date, showAgo = true) {
-        const now = moment();
-        const givenDate = moment(date);
-
-        const daysAgo = now.diff(givenDate, "days");
-        const hoursAgo = now.diff(givenDate, "hours") % 24; // Remaining hours after subtracting days
-
-        const formattedDate = givenDate.format("dddd MMMM Do YYYY [@] h:mma"); // Main date format
-
-        let timeAgo = "";
-        if (showAgo) {
-            if (daysAgo > 0) {
-                timeAgo = `(${daysAgo} days ${hoursAgo} hours ago)`;
-            } else {
-                timeAgo = `(${hoursAgo} hours ago)`;
-            }
-        }
-
-        return `${formattedDate} ${timeAgo}`.trim();
-    }
+    
 
     useEffect(() => {
         const code = async () => {

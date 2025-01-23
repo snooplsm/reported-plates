@@ -56,7 +56,8 @@ export enum ReportErrors {
 export interface Report {
     license: string
     state:string
-    files: File[],
+    files: File[]
+    colorTaxi?: string
     timeofreport: Date
     address: Feature
     reportDescription: string
@@ -65,6 +66,7 @@ export interface Report {
     typeofcomplaint: ComplaintType,
     user: User
 }
+
 
 
 export const submitReport = async (r:Report) => {
@@ -151,6 +153,75 @@ export const login = async (response:any, onAlreadyExists:(accessToken:string,de
     }
 }
 
+export interface SubmissionQuery {
+    startDate?:Date,
+    endDate?:Date,
+    reqNumber:string,
+    license:string
+}
+
+export interface SimpleReport {
+    id: string
+    license: string
+    state: string
+    timeofreport: Date
+    reqnumber: string
+    typeofcomplaint: ComplaintType
+    files: string[]
+    loc1_address: string
+    location: number[]
+}
+
+const transformSubmission = (p:Parse.Object): SimpleReport => {
+    const loc = p.get('location')
+    return {
+        id: p.id,
+        license: p.get('license'),
+        state: p.get('state'),
+        timeofreport: p.get('timeofreport'),
+        typeofcomplaint: p.get("typeofcomplaint"),
+        loc1_address: p.get('loc1_address'),
+        reqnumber: p.get("reqnumber") || '',
+        location: [loc.latitude, loc.longitude  ],
+        files: [p.get('photoData0'),p.get('photoData1'),p.get('PhotoData3')].filter(x=>x!=null).map(x=>x.url())
+    } as SimpleReport
+}
+
+// Example usage
+export const querySubmissions = async ({startDate, endDate, reqNumber, license }: SubmissionQuery): Promise<SimpleReport[]> => {
+    const Submission = Parse.Object.extend("submission");
+    const query = new Parse.Query(Submission);
+    const currentUser = Parse.User.current();
+    query.equalTo("user", currentUser);
+
+    // Date range filter for `timeofincident`
+    if (startDate && endDate) {
+      query.greaterThanOrEqualTo("timeofincident", startDate);
+      query.lessThanOrEqualTo("timeofincident", endDate);
+    } else if (startDate) {
+    //   query.greaterThanOrEqualTo("timeofincident", startDate);
+    }
+  
+    // Partial match for `reqnumber`
+    if (reqNumber) {
+      query.matches("reqnumber", reqNumber, "i"); // Case-insensitive regex match
+    }
+  
+    // Partial match for `license`
+    if (license) {
+      query.matches("license", license, "i"); // Case-insensitive regex match
+    }
+    query.ascending("timeofincident");
+    try {
+        console.log(query)
+      const results = await query.find();
+      console.log("Query Results:", results);
+      return results.map((x:any)=>transformSubmission(x as Parse.Object));
+    } catch (error) {
+      console.error("Error querying submissions:", error);
+      throw error;
+    }
+  }
 export const forgotEmail = async (email:string):Promise<any> => {
     await Parse.User.requestPasswordEmail(email)
     return true
