@@ -117,7 +117,7 @@ export const submitReport = async (r:Report, phone?:string) => {
     s.set('Phone', phone || user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)
-    if(phone != current.get('Phone')) {
+    if(phone && phone != current.get('Phone')) {
         current.set('Phone', phone)
         await current.save()
         userLogin.next(current)

@@ -6,7 +6,7 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography, Avatar, Card, CardActionArea } from "@mui/material";
+import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography, Avatar, Card, CardActionArea, Snackbar, Slide } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
@@ -23,10 +23,11 @@ import { BasicDateTimePicker } from './BasicDateTimePicker';
 import { MapPickerView } from './MapPickerView';
 import { JwtPayload } from 'jwt-decode';
 import LoginModal from './LoginModal';
-import { isLoggedIn, login, Report, ReportErrors, ReportError, userLogin, userLogout, User } from './Auth';
+import { isLoggedIn, login, Report, ReportErrors, userLogin, userLogout, User } from './Auth';
 import TextArea from './TextArea';
 import { SubmissionPreview } from './SubmissionPreview';
 import { classifyVehicle } from './classifyVehicle';
+import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
 
 
 function App() {
@@ -53,6 +54,8 @@ function App() {
 
   const [showLoginModal, setShowLoginModal] = useState<[string, JwtPayload]>()
 
+  const [snack, setSnack] = useState<Report>()
+
   const [isSignedIn, setIsSignedIn] = useState<User>()
 
   const [dateOfIncident, setDateOfIncident] = useState<Date>()
@@ -70,6 +73,18 @@ function App() {
   const [showReportPreview, setShowReportPreview] = useState(false)
 
   const [reportError, setReportError] = useState<Set<ReportErrors>>()
+
+  const clearState = () => {
+    setFiles(new Set())
+    setFileNames(new Set())
+    setReportPreview(undefined)
+    setCurrentFile(undefined)
+    setReportError(undefined)
+    setDateOfIncident(undefined)
+    setLatLng(undefined)
+    setComplaint(undefined)
+    setLocation(undefined)
+  }
 
   useEffect(() => {
     const loginSub = userLogin.subscribe((user) => {
@@ -242,12 +257,12 @@ function App() {
       user: user!
     } as Report
     classifyVehicle(license!, state)
-    .then(result=> {
-      report.colorTaxi = result.vehicleType
-      setReportPreview(report)
-    }).catch(e=> {
-      console.log("error on plate lookup")
-    })
+      .then(result => {
+        report.colorTaxi = result.vehicleType
+        setReportPreview(report)
+      }).catch(e => {
+        console.log("error on plate lookup")
+      })
     return report
   }
 
@@ -370,39 +385,39 @@ function App() {
               fontSize: "90%"
             }}>{step++} & {step++}</StepView>
           </Paper>
-          {files.size>0 && <Paper>
-          <Box
-          display="flex"
-           sx={{
-            position: "relative",
-            height: "auto",
-            
-            padding: .5,
-            width: "100%", overflow: "display",
-          }}>
-            {[...(files || [])].map((x, index) => {
-              return <FileUploadPreview onClick={() => {
-                setCurrentFile(index)
-              }} file={x} onClickDelete={() => {
-                setFiles((files) => {
-                  let fileIndex = undefined
-                  if(currentFile) {
-                    fileIndex = [...files].indexOf(x)
-                    if(fileIndex<=currentFile) {
-                      fileIndex = Math.max(0,currentFile-1)
+          {files.size > 0 && <Paper>
+            <Box
+              display="flex"
+              sx={{
+                position: "relative",
+                height: "auto",
+
+                padding: .5,
+                width: "100%", overflow: "display",
+              }}>
+              {[...(files || [])].map((x, index) => {
+                return <FileUploadPreview onClick={() => {
+                  setCurrentFile(index)
+                }} file={x} onClickDelete={() => {
+                  setFiles((files) => {
+                    let fileIndex = undefined
+                    if (currentFile) {
+                      fileIndex = [...files].indexOf(x)
+                      if (fileIndex <= currentFile) {
+                        fileIndex = Math.max(0, currentFile - 1)
+                      }
+                      if (files.size - 1 <= 0) {
+                        fileIndex = undefined
+                      }
                     }
-                    if(files.size-1 <=0) {
-                      fileIndex = undefined
-                    }
-                  }
-                  setCurrentFile(fileIndex)
-                  fileNames.delete(x.name)
-                  files.delete(x)
-                  return new Set(files)
-                })
-              }} />
-            })}
-          </Box>
+                    setCurrentFile(fileIndex)
+                    fileNames.delete(x.name)
+                    files.delete(x)
+                    return new Set(files)
+                  })
+                }} />
+              })}
+            </Box>
           </Paper>}
           <Paper sx={{
             width: "100%",
@@ -419,7 +434,7 @@ function App() {
                 <DetectionView onPlateChange={onPlate} plate={plate} />
               </Box>
               <StepView hasError={reportError && (reportError.has(ReportErrors.MISSING_PLATE) || reportError.has(ReportErrors.MISSING_PLATE_STATE))}>
-              {step++}</StepView>
+                {step++}</StepView>
             </Box>
           </Paper>
 
@@ -432,26 +447,26 @@ function App() {
             <CardActionArea sx={{
               flex: 1
             }}>
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    textAlign: "center",
-                    color: theme.palette.primary.main
-                  }}
-                  size='large'
-                  onClick={async () => {
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  textAlign: "center",
+                  color: theme.palette.primary.main
+                }}
+                size='large'
+                onClick={async () => {
 
-                    const report = getReport()
+                  const report = getReport()
 
-                    setSubmitting(true)
-                    setReportPreview(report)
-                    setShowReportPreview(true)
-                  }}
-                >
-                  VERIFY & SUBMIT
-                </Typography>
-                </CardActionArea>
-              <StepView hasError={undefined}>{step+2}</StepView>
+                  setSubmitting(true)
+                  setReportPreview(report)
+                  setShowReportPreview(true)
+                }}
+              >
+                VERIFY & SUBMIT
+              </Typography>
+            </CardActionArea>
+            <StepView hasError={undefined}>{step + 2}</StepView>
           </Paper>
         </Box>
         {/* Right Column */}
@@ -500,18 +515,18 @@ function App() {
             <MapPickerView latLng={latLng} location={location} onLocationChange={(location) => {
               setLatLng([location?.features[0].geometry.coordinates[1], location?.features[0].geometry.coordinates[0]])
               setLocation(location)
-            }} />        
+            }} />
             <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_ADDRESS)}>
               {step++}
-            </StepView>    
-        </Paper>
-        <Paper sx={{
-          marginTop: 3,
+            </StepView>
+          </Paper>
+          <Paper sx={{
+            marginTop: 3,
             position: "relative",
             padding: 1,
             paddingTop: 2
-            
-        }}>
+
+          }}>
             <BasicDateTimePicker onChange={(value) => {
               setDateOfIncident(value)
             }} value={dateOfIncident} />
@@ -543,8 +558,31 @@ function App() {
             onCancel={() => {
               setShowReportPreview(false)
             }}
+            onComplete={(report)=> {
+              setShowReportPreview(false)
+              setReportPreview(undefined)
+              clearState()
+              enqueueSnackbar(`${report.typeofcomplaint} w/ plate ${report.license} @ ${report.address.properties.label} at ${report.timeofreport}`, {
+                autoHideDuration: 20000,
+                variant: 'success',
+                action: (key) => (
+                  <>
+                      {/* <Button
+                          size='small'
+                          onClick={() => alert(`Clicked on action of snackbar with id: ${key}`)}
+                      >
+                          Undo
+                      </Button> */}
+                      <Button size='small' onClick={() => closeSnackbar(key)}>
+                          Dismiss
+                      </Button>
+                  </>
+              )
+              })
+            }}
             open={showReportPreview}
             report={reportPreview} />}
+        <SnackbarProvider/>
       </Box>
     </ThemeProvider>
   )

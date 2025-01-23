@@ -1,13 +1,15 @@
-import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Dialog, DialogContent, Modal, TextField, Typography } from "@mui/material"
-import { Report, submitReport } from "./Auth"
-import { useEffect, useState } from "react"
+import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Modal, TextField, Typography } from "@mui/material";
+import { LoadingButton } from "@mui/lab";
+import { Report, submitReport } from "./Auth";
+import { useEffect, useState } from "react";
 import moment from "moment";
-import heic2any from "heic2any"
+import heic2any from "heic2any";
 
 export interface SubmissionProps {
     report: Report
     onClose?: () => void
     onCancel?: () => void
+    onComplete?: (report:Report)=> void
     open: boolean
 }
 
@@ -32,7 +34,7 @@ export function formatCustomDate(date:Date, showAgo = true) {
     return `${formattedDate} ${timeAgo}`.trim();
 }
 
-export const SubmissionPreview = ({ report, onClose, onCancel, open }: SubmissionProps) => {
+export const SubmissionPreview = ({ report, onClose, onCancel, onComplete, open }: SubmissionProps) => {
 
     const [images, setImages] = useState<string[]>([])
 
@@ -162,8 +164,8 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
                     </Box>
                     }
                 </CardContent>
-                <CardActions disableSpacing>
-                    <Button
+                <CardActions>
+                    <LoadingButton
                         onClick={()=> {
                             if(submitting) {
                                 return
@@ -171,6 +173,7 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
                             const phoneNumber = phone || report.user.phone || ''
                             if(!isValidPhoneNumber(phoneNumber)) {
                                 setPhoneError(true)
+                                return
                             } else {
                                 setPhoneError(false)
                             }
@@ -178,18 +181,19 @@ export const SubmissionPreview = ({ report, onClose, onCancel, open }: Submissio
                             submitReport(report, phone)
                             .then(result=> {
                                 setSubmitting(false)
-                                window.location.reload()
+                                onComplete?.(report)
                             }).catch(err=> {
                                 setSubmitting(false)
                             })
                         }}
                         loading={submitting}
-                     size="small" color="primary">
+                        disabled={submitting}
+                        loadingPosition="start">
                         Submit
-                    </Button>
+                    </LoadingButton>
                     <Button onClick={() => {
                         onCancel?.()
-                    }} size="small" color="secondary">
+                    }} color="secondary">
                         Cancel
                     </Button>
                 </CardActions>

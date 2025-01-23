@@ -18,12 +18,10 @@ export const StepView = ({children, hasError, sx}:StepProps) => {
         return "rgb(70, 114, 40)"
     }
     const fontcolor = ()=> {
-        if(hasError==undefined || hasError===true) {
+        if(hasError==undefined) {
             return "rgb(0,0,0)"
         }
-        if(!hasError) {
-            return "rgb(233,233,233)"
-        } 
+        return "rgb(233,233,233)" 
     }
 
     console.log(children)

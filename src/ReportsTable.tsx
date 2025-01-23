@@ -111,7 +111,11 @@ export default function ReportsTable({ reports, onReports = (reports) => {}, sta
             },
         },
         { field: 'reqnumber', headerName: '311#', width: 140 },
-        { field: 'license', headerName: 'License #', width: 150 },
+        { field: 'license', headerName: 'License #', 
+            valueGetter: (value: any, row: any) => {
+                return `${row.license}:${row.state}`
+            },
+            width: 150 },
         { field: 'loc1_address', headerName: 'Address', width: 350 },
         {
             field: 'timeofreport',
