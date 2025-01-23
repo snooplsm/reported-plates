@@ -5,8 +5,7 @@ import { UserView } from "./UserView";
 import { BasicDateTimePicker } from "./BasicDateTimePicker";
 import { useEffect, useState } from "react";
 import ReportsTable from "./ReportsTable";
-import { querySubmissions, SimpleReport } from "./Auth";
-import moment from "moment";
+import { querySubmissions, getStatuses, SimpleReport, Status } from "./Auth";
 import { ReportView } from "./ReportView";
 
 export const Reports = () => {
@@ -18,6 +17,17 @@ export const Reports = () => {
   const [reports, setReports] = useState<SimpleReport[]>()
 
   const [selectedReport, setSelectedReport] = useState<SimpleReport>()
+
+  const [statuses, setStatuses] = useState<Map<number,Status>>()
+
+  useEffect(()=> {
+    getStatuses()
+    .then(stats=> {
+      if(stats) {
+        setStatuses(stats)
+      }
+    })
+  },[])
 
 
   useEffect(() => {
@@ -103,7 +113,9 @@ export const Reports = () => {
     }}
     height="100vh"
   >    
-    <ReportsTable reports={reports} onReportClicked={(report)=> setSelectedReport(report)}/>
+    <ReportsTable reports={reports} onReports={(reports)=> {
+      setReports(reports)
+    }} onReportClicked={(report)=> setSelectedReport(report)}/>
   </Box>
   {selectedReport && <ReportView onCancel={()=>setSelectedReport(undefined)} open={selectedReport!=undefined} report={selectedReport}/>}
 </ThemeProvider>

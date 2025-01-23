@@ -4,6 +4,7 @@ import {jwtDecode, JwtPayload} from "jwt-decode";
 import { ComplaintType } from './Complaints';
 import { Feature } from './api/ny/nyc/nyc';
 import { Subject } from 'rxjs';
+import { Exception } from '@techstark/opencv-js';
 
 const PARSE_APPLICATION_ID = 'jkAZF8ojV4vOGnhSBjdwiMWBKpWML5tM4SWGKgOV';
 const PARSE_HOST_URL = 'https://parseapi.back4app.com/';
@@ -67,7 +68,25 @@ export interface Report {
     user: User
 }
 
+export const deleteReport = async(id:string) => {
+    const Submission = Parse.Object.extend("submission");
 
+  // Create a pointer to the object with the given id
+    const submission = Submission.createWithoutData(id)
+    // submission.set("id", id);
+
+    try {
+        // Delete the object
+        await submission.destroy();
+        return true
+    } catch (error) {
+        if(error.code==101) {
+            return true
+        } else {
+            return false
+        }
+    }
+}
 
 export const submitReport = async (r:Report, phone?:string) => {
     const current = await Parse.User.current()
@@ -96,7 +115,7 @@ export const submitReport = async (r:Report, phone?:string) => {
     s.set('reportDescription', r.reportDescription)
     s.set('testify', true)
     s.set('operating_system', 'web')
-    s.set('Phone', user.phone || current.get('Phone'))
+    s.set('Phone', phone || user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)
     if(phone != current.get('Phone')) {
@@ -165,7 +184,8 @@ export interface SimpleReport {
     id: string
     license: string
     state: string
-    timeofreport: Date
+    timeofreport: Date,
+    status: number,
     reqnumber: string
     typeofcomplaint: ComplaintType
     files: string[]
@@ -186,8 +206,41 @@ const transformSubmission = (p:Parse.Object): SimpleReport => {
         reqnumber: p.get("reqnumber") || '',
         location: [loc.latitude, loc.longitude  ],
         reportDescription: p.get("reportDescription"),
+        status: p.get('status'),
         files: [p.get('photoData0'),p.get('photoData1'),p.get('PhotoData3')].filter(x=>x!=null).map(x=>x.url())
     } as SimpleReport
+}
+
+export interface Status {
+    id: string
+    text: string
+
+}
+
+export const getStatuses = async ():Promise<Map<Number,Status> | undefined> =>  {
+    const statuses = localStorage.getItem('statuses')
+    if(statuses) {
+        return JSON.parse(statuses) as Map<number,Status>
+    }
+    const Submission = Parse.Object.extend("Statuses");
+    const query = new Parse.Query(Submission)
+    query.ascending("timeofincident");
+    try {
+        const k = await query.find()
+        const map = new Map(k.map((x:any)=> {
+            const f = x as Parse.Object
+            const status = {
+                id: f.get('sId'),
+                text: f.get('text')
+            } as Status
+            return [status.id,status]
+        }))
+        localStorage.setItem('statuses', JSON.stringify(map))
+        return map
+    } catch(error) {
+
+    }
+
 }
 
 // Example usage
