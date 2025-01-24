@@ -24,7 +24,7 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
-const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:DetectProps) => {
+const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
@@ -134,6 +134,9 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:De
                 mat.delete()
                 const plate = await detectPlate(roi)
                 // setPlateOverride(plate)
+                if(plate && onPlate) {
+                    onPlate(plate)
+                }
                 roi.delete()
             }
         }
@@ -274,6 +277,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:De
                 overflow: "auto",
                 margin: 1,
                 width: "auto",
+                height: "auto"
             }}>
                 <Box
                     ref={boxRef}
@@ -295,8 +299,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:De
                             transform: `scale(${scale})`,
                             transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
                             width: "100%",
-                            height: "auto",
-                            maxHeight: "800px",
+                            height: "70vh",
                             display: "block", // Prevent inline-block issues
                             cursor: cursor,
                         }}
@@ -308,7 +311,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:De
                             top: 0,
                             left: 0,
                             width: "100%",
-                            height: "100%",
+                            height: "70vh",
                             display: "block", // Ensures the canvas behaves like an inline element
                             cursor: cursor,
                             pointerEvents: "auto"

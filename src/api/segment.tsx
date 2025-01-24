@@ -634,12 +634,6 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
         throw new Error("Batch size other than 1 is not supported");
     }
 
-    // Assuming data is [x_center, y_center, width, height, class_prob_1, class_prob_2, ...]
-    const xCenter = data2[0];
-    const yCenter = data2[1];
-    const width = data2[2];
-    const height = data2[3];
-
     // Class probabilities start from index 4
     const classProbabilities = data2.slice(4);
 
@@ -674,7 +668,6 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
         plate.tlc = true
         plate.state = State.NY
     }
-    console.log(plate)
     matC4.delete()
     return plate
 }
