@@ -1,12 +1,10 @@
-import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Dialog, DialogContent, Modal, TextField, Typography } from "@mui/material"
-import { SimpleReport, submitReport } from "./Auth"
-import { useEffect, useState } from "react"
+import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Modal, Typography } from "@mui/material"
+import { SimpleReport } from "./Auth"
+import { useState } from "react"
 import moment from "moment";
-import heic2any from "heic2any"
 
 export interface ReportProps {
     report: SimpleReport
-    onClose?: () => void
     onCancel?: () => void
     open: boolean
 }
@@ -32,7 +30,7 @@ export function formatCustomDate(date:Date, showAgo = true) {
     return `${formattedDate} ${timeAgo}`.trim();
 }
 
-export const ReportView = ({ report, onClose, onCancel, open }: ReportProps) => {
+export const ReportView = ({ report, onCancel, open }: ReportProps) => {
 
     const [images] = useState<string[]>(report.files)
 

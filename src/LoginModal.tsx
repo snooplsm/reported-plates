@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Button,
   TextField,
-  Typography,
+  Button,
   Link,
-  Container,
   CssBaseline,
   Grid,
   Dialog,
@@ -13,6 +11,7 @@ import {
   DialogTitle,
   DialogActions,
 } from '@mui/material';
+import { LoadingButton } from '@mui/lab'
 import { forgotEmail, loginWithPassword, User } from './Auth';
 import { JwtPayload } from 'jwt-decode';
 
@@ -41,10 +40,13 @@ const LoginModal = ({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true)
     loginWithPassword(email,password, payload![0], payload![1])
     .then(ok=> {
+      setLoading(false)
       onLoggedIn(ok)
     }).catch(e=> {
+      setLoading(false)
       console.log(e)
     })
   };
@@ -98,15 +100,16 @@ const LoginModal = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button
+        <LoadingButton
           loading={loading}
-          type="submit"
+          // type="submit"
+          disabled={loading}
           variant="contained"
           onClick={handleSubmit}
           sx={{ mt: 3, mb: 2 }}
         >
           Login
-        </Button>
+        </LoadingButton>
         <Button onClick={onClose} variant="outlined">
           Cancel
         </Button>

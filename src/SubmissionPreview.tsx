@@ -7,7 +7,6 @@ import heic2any from "heic2any";
 
 export interface SubmissionProps {
     report: Report
-    onClose?: () => void
     onCancel?: () => void
     onComplete?: (report:Report)=> void
     open: boolean
@@ -34,7 +33,7 @@ export function formatCustomDate(date:Date, showAgo = true) {
     return `${formattedDate} ${timeAgo}`.trim();
 }
 
-export const SubmissionPreview = ({ report, onClose, onCancel, onComplete, open }: SubmissionProps) => {
+export const SubmissionPreview = ({ report, onCancel, onComplete, open }: SubmissionProps) => {
 
     const [images, setImages] = useState<string[]>([])
 
@@ -179,10 +178,10 @@ export const SubmissionPreview = ({ report, onClose, onCancel, onComplete, open 
                             }
                             setSubmitting(true)
                             submitReport(report, phone)
-                            .then(result=> {
+                            .then(()=> {
                                 setSubmitting(false)
                                 onComplete?.(report)
-                            }).catch(err=> {
+                            }).catch(()=> {
                                 setSubmitting(false)
                             })
                         }}

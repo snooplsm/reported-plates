@@ -39,7 +39,6 @@ export const downloadAll = async (setLoading: unknown) => {
     }
     const promises: Promise<ArrayBuffer>[] = [];
     models.forEach(([type, modelName]) => {
-        console.log(`${import.meta.env.BASE_URL}models/${modelName}.onnx`)
         const url = `${import.meta.env.BASE_URL}models/${modelName}.onnx`
         promises.push(download(
             url,
@@ -47,7 +46,6 @@ export const downloadAll = async (setLoading: unknown) => {
                 () => setLoading]
         ))
     })
-    console.log("all")
     downloading = Promise.all(promises).then(async result => {        
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
@@ -56,10 +54,7 @@ export const downloadAll = async (setLoading: unknown) => {
         ocr = await InferenceSession.create(result[5]);
         downloaded = true
         downloading = null
-        console.log("downloaded")
-    }).catch(k => {
-        console.log("error", k)
-    })
+    }).catch(console.log)
     return downloading
 }
 
@@ -108,7 +103,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 toType: "image/jpeg"
             })
             file2Use = URL.createObjectURL(converted)
-            } catch(e:Exception) {
+            } catch(e) {
                 console.log(e)
             }
         } else {
@@ -124,7 +119,6 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
             const src = cv.imread(image)
             const modelWidth = modelInputShape[2];
             const modelHeight = modelInputShape[3];
-            console.log("Image loaded!", src);
             const matC3 = new cv.Mat(src.rows, src.cols, cv.CV_8UC3); // new image matrix
             cv.cvtColor(src, matC3, cv.COLOR_RGBA2BGR); // RGBA to BGR
             const [w, h] = divStride(32, matC3.cols, matC3.rows);
@@ -175,10 +169,8 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 const score = Math.max(...scores); // maximum probability scores
                 const label = scores.indexOf(score); // class id of maximum probability scores
                 if (!yoloSegVehicles.has(label)) {
-                    console.log("no label")
                     continue
                 }
-                console.log("has label", yoloSegIndexToLabel[label])
                 let box:[x:number,y:number,w:number,h:number] = overflowBoxes(
                     [
                         abox[0] - 0.5 * abox[2], // before upscale x
@@ -227,7 +219,6 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     }); // update boxes to draw later
                 }
             }
-            console.log(boxes.map(x=>x.bounding))
             boxes = boxes.sort((a, b) => {
                 // Image center
                 const centerX = modelWidth / 2;
@@ -256,11 +247,8 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     return distanceA - distanceB; // Closer distance comes first
                 }
             });
-            console.log(boxes.map(x=>x.bounding))
             for (const box of boxes) {
                 const [x, y, w, h] = box.scaled
-                console.log("boudning", box.bounding)
-                console.log("scaled", box.scaled)
                 const rect = new cv.Rect(x, y, w, h)
                 const roi = src.roi(rect).clone()
                 let canvas = document.createElement('canvas') as HTMLCanvasElement;
@@ -980,11 +968,7 @@ function letterbox(
         cv.resize(im, resized, newSize, 0, 0, cv.INTER_LINEAR);
     } else {
         resized = im.clone();
-    }
-    console.log("Rows (Height):", resized.rows);
-    console.log("Cols (Width):", resized.cols);
-    console.log("Channels:", resized.channels());
-    console.log("Type:", resized.type()); // E.g., cv.CV_8UC3
+    }    
     if (resized.channels() === 1) {
         cv.cvtColor(resized, resized, cv.COLOR_GRAY2RGB); // Convert grayscale to BGR
     } else if (resized.channels() === 4) {
@@ -992,10 +976,6 @@ function letterbox(
     } else {
         // roi.copyTo(matC3); // If already 3 channels, just copy
     }
-    console.log("Rows (Height):", resized.rows);
-    console.log("Cols (Width):", resized.cols);
-    console.log("Channels:", resized.channels());
-    console.log("Type:", resized.type()); // E.g., cv.CV_8UC3
 
     // Add padding to maintain the new shape
     const top = Math.round(dh - 0.1);

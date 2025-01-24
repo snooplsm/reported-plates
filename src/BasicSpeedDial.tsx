@@ -43,15 +43,24 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
 
   const nav = useNavigate()
 
+  console.log(avatarUrl)
   return (
     <Box sx={{
     }}>
-      <Fab ref={anchorRef} onClick={handleToggle}>
-        <Avatar src={avatarUrl} />
+      <Fab 
+      sx={{
+        transition: "transform   0.1s ease", // Smooth hover effect
+        "&:hover": {
+          transform: "scale(1.09)", // Scale image on hover        
+          cursor: "pointer"
+      }
+      }}
+        ref={anchorRef} onClick={handleToggle}>
+        <Avatar sx={{width: "100%", height: "100%"}} src={avatarUrl} />
       </Fab>
       <Popper
         sx={{
-          zIndex: 7
+          zIndex: 700
         }}
         open={open}
         anchorEl={anchorRef.current}
@@ -78,11 +87,11 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
                   aria-labelledby="composition-button"
                 // onKeyDown={handleListKeyDown}
                 >
-                  <MenuItem onClick={(event)=> {
+                  <MenuItem onClick={(event) => {
                     handleClose(event)
                     nav('/')
                   }}>New Report</MenuItem>
-                  <MenuItem onClick={(event)=> {
+                  <MenuItem onClick={(event) => {
                     handleClose(event)
                     nav('/reports')
                   }}>My Reports</MenuItem>

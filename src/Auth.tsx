@@ -1,6 +1,6 @@
 // Import Parse minified version
 import Parse from 'parse/dist/parse.min.js';
-import {jwtDecode, JwtPayload} from "jwt-decode";
+import { jwtDecode, JwtPayload } from "jwt-decode";
 import { ComplaintType } from './Complaints';
 import { Feature } from './api/ny/nyc/nyc';
 import { Subject } from 'rxjs';
@@ -15,28 +15,28 @@ export const userLogout = new Subject<boolean>()
 export const userLogin = new Subject<User>()
 
 export interface User {
-    firstName:string
-    lastName:string
-    id:string,
-    email:string,
-    phone?:string
+    firstName: string
+    lastName: string
+    id: string,
+    email: string,
+    phone?: string
 }
 
-export const loginWithPassword = async(email:string, password:string, accessToken:string, jwt:JwtPayload):Promise<User> => {
+export const loginWithPassword = async (email: string, password: string, accessToken: string, jwt: JwtPayload): Promise<User> => {
     try {
         const user = await Parse.User.logIn(email, password)
-        return await login({credential:accessToken}, user)
-    } catch(e) {
+        return await login({ credential: accessToken }, user)
+    } catch (e) {
         throw e
     }
 }
 
 export interface ReportError {
-    errors:ReportError[]
+    errors: ReportError[]
 }
 
 export interface ReportErrorConstructor {
-    new (errors: ReportErrors[]): ReportError;
+    new(errors: ReportErrors[]): ReportError;
     (errors: ReportErrors[]): ReportError;
     readonly prototype: Error;
 }
@@ -50,12 +50,12 @@ export enum ReportErrors {
     MISSING_DATE,
     MISSING_ADDRESS,
     MISSING_COMPLAINT,
-    NOT_LOGGED_IN             
-  }
+    NOT_LOGGED_IN
+}
 
 export interface Report {
     license: string
-    state:string
+    state: string
     files: File[]
     colorTaxi?: string
     timeofreport: Date
@@ -67,10 +67,10 @@ export interface Report {
     user: User
 }
 
-export const deleteReport = async(id:string) => {
+export const deleteReport = async (id: string) => {
     const Submission = Parse.Object.extend("submission");
 
-  // Create a pointer to the object with the given id
+    // Create a pointer to the object with the given id
     const submission = Submission.createWithoutData(id)
     // submission.set("id", id);
 
@@ -79,17 +79,20 @@ export const deleteReport = async(id:string) => {
         await submission.destroy();
         return true
     } catch (error) {
-        if(error.code==101) {
-            return true
-        } else {
-            return false
+        if(error instanceof Parse.Error) {
+            if (error.code == 101) {
+                return true
+            } else {
+                return false
+            }
         }
+        return false
     }
 }
 
-export const submitReport = async (r:Report, phone?:string) => {
+export const submitReport = async (r: Report, phone?: string):Promise<SimpleReport> =>  {
     const current = await Parse.User.current()
-    if(!current) {
+    if (!current) {
         throw Error("Not Logged In")
     }
     const Submission = Parse.Object.extend("submission")
@@ -117,27 +120,37 @@ export const submitReport = async (r:Report, phone?:string) => {
     s.set('Phone', phone || user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)
-    if(phone && phone != current.get('Phone')) {
+    if (phone && phone != current.get('Phone')) {
         current.set('Phone', phone)
         await current.save()
-        userLogin.next(current)
+        userLogin.next(toUser(current))
     }
     let index = 0
-    if(r.files.length>2) {
+    if (r.files.length > 2) {
         throw Error("Too Many Files")
     }
 
-    for(const file of r.files) {
+    for (const file of r.files) {
         const f = new Parse.File(file.name, file);
         const photo = await f.save()
         s.set(`photoData${index}`, photo)
         index++
     }
 
-    const result = await s.save()
+    (await s.save())
+    return {
+        id: s.id,
+        license: s.get("license"),
+        state: s.get('state'),
+        timeofreport: s.get('timeofreport'),
+        status: 0,
+        reqnumber: s.get('reqnumber') || '',
+        typeofcomplaint: s.get("typeofcomplaint"),
+        files: [s.get('photoData0'), s.get('photoData1'), s.get('photoData2')].filter(x=>x!=null).map(x=>x.url())
+    } as SimpleReport
 }
 
-export const login = async (response:any, onAlreadyExists:(accessToken:string,decoded:JwtPayload)=>void):Promise<User|undefined> => {
+export const login = async (response: any, onAlreadyExists: (accessToken: string, decoded: JwtPayload) => void): Promise<User | undefined> => {
     const accessToken = response.credential
     const current = await Parse.User.current()
     const decoded = jwtDecode(accessToken);
@@ -150,21 +163,21 @@ export const login = async (response:any, onAlreadyExists:(accessToken:string,de
     userToLogin.set('email', userEmail);
     try {
         let loggedInUser: Parse.User = await userToLogin.linkWith('google', {
-            authData: {id: userGoogleId, id_token: userTokenId},
+            authData: { id: userGoogleId, id_token: userTokenId },
         })
         localStorage.setItem('user', JSON.stringify(decoded))
-        if(!loggedInUser.get('FirstName')) {
-            loggedInUser.set('FirstName', decoded.given_name)            
+        if (!loggedInUser.get('FirstName')) {
+            loggedInUser.set('FirstName', decoded.given_name)
         }
-        if(!loggedInUser.get('LastName')) {
+        if (!loggedInUser.get('LastName')) {
             loggedInUser.set('LastName', decoded.family_name)
         }
         await loggedInUser.save()
         userLogin.next(toUser(loggedInUser))
         return loggedInUser
-    } catch(e) {
-        if(e.code==202) {
-            onAlreadyExists(accessToken, decoded)            
+    } catch (e) {
+        if (e.code == 202) {
+            onAlreadyExists(accessToken, decoded)
         } else {
             console.log(e)
             throw e
@@ -173,10 +186,10 @@ export const login = async (response:any, onAlreadyExists:(accessToken:string,de
 }
 
 export interface SubmissionQuery {
-    startDate?:Date,
-    endDate?:Date,
-    reqNumber:string,
-    license:string
+    startDate?: Date,
+    endDate?: Date,
+    reqNumber: string,
+    license: string
 }
 
 export interface SimpleReport {
@@ -193,7 +206,7 @@ export interface SimpleReport {
     reportDescription: string
 }
 
-const transformSubmission = (p:Parse.Object): SimpleReport => {
+const transformSubmission = (p: Parse.Object): SimpleReport => {
     const loc = p.get('location')
     return {
         id: p.id,
@@ -203,10 +216,10 @@ const transformSubmission = (p:Parse.Object): SimpleReport => {
         typeofcomplaint: p.get("typeofcomplaint"),
         loc1_address: p.get('loc1_address'),
         reqnumber: p.get("reqnumber") || '',
-        location: [loc.latitude, loc.longitude  ],
+        location: [loc.latitude, loc.longitude],
         reportDescription: p.get("reportDescription"),
         status: p.get('status'),
-        files: [p.get('photoData0'),p.get('photoData1'),p.get('PhotoData3')].filter(x=>x!=null).map(x=>x.url())
+        files: [p.get('photoData0'), p.get('photoData1'), p.get('PhotoData3')].filter(x => x != null).map(x => x.url())
     } as SimpleReport
 }
 
@@ -216,34 +229,34 @@ export interface Status {
 
 }
 
-export const getStatuses = async ():Promise<Map<Number,Status> | undefined> =>  {
+export const getStatuses = async (): Promise<Map<Number, Status> | undefined> => {
     const statuses = localStorage.getItem('statuses')
-    if(statuses) {
-        return JSON.parse(statuses) as Map<number,Status>
+    if (statuses) {
+        return JSON.parse(statuses) as Map<number, Status>
     }
     const Submission = Parse.Object.extend("Statuses");
     const query = new Parse.Query(Submission)
     query.ascending("timeofincident");
     try {
         const k = await query.find()
-        const map = new Map(k.map((x:any)=> {
+        const map = new Map(k.map((x: any) => {
             const f = x as Parse.Object
             const status = {
                 id: f.get('sId'),
                 text: f.get('text')
             } as Status
-            return [status.id,status]
+            return [status.id, status]
         }))
         localStorage.setItem('statuses', JSON.stringify(map))
         return map
-    } catch(error) {
+    } catch (error) {
 
     }
 
 }
 
 // Example usage
-export const querySubmissions = async ({startDate, endDate, reqNumber, license }: SubmissionQuery): Promise<SimpleReport[]> => {
+export const querySubmissions = async ({ startDate, endDate, reqNumber, license }: SubmissionQuery): Promise<SimpleReport[]> => {
     const Submission = Parse.Object.extend("submission");
     const query = new Parse.Query(Submission);
     const currentUser = Parse.User.current();
@@ -251,43 +264,43 @@ export const querySubmissions = async ({startDate, endDate, reqNumber, license }
 
     // Date range filter for `timeofincident`
     if (startDate && endDate) {
-      query.greaterThanOrEqualTo("timeofincident", startDate);
-      query.lessThanOrEqualTo("timeofincident", endDate);
+        query.greaterThanOrEqualTo("timeofincident", startDate);
+        query.lessThanOrEqualTo("timeofincident", endDate);
     } else if (startDate) {
-    //   query.greaterThanOrEqualTo("timeofincident", startDate);
+        //   query.greaterThanOrEqualTo("timeofincident", startDate);
     }
-  
+
     // Partial match for `reqnumber`
     if (reqNumber) {
-      query.matches("reqnumber", reqNumber, "i"); // Case-insensitive regex match
+        query.matches("reqnumber", reqNumber, "i"); // Case-insensitive regex match
     }
-  
+
     // Partial match for `license`
     if (license) {
-      query.matches("license", license, "i"); // Case-insensitive regex match
+        query.matches("license", license, "i"); // Case-insensitive regex match
     }
     query.ascending("timeofincident");
     try {
         console.log(query)
-      const results = await query.find();
-      console.log("Query Results:", results);
-      return results.map((x:any)=>transformSubmission(x as Parse.Object));
+        const results = await query.find();
+        console.log("Query Results:", results);
+        return results.map((x: any) => transformSubmission(x as Parse.Object));
     } catch (error) {
-      console.error("Error querying submissions:", error);
-      throw error;
+        console.error("Error querying submissions:", error);
+        throw error;
     }
-  }
-export const forgotEmail = async (email:string):Promise<any> => {
+}
+export const forgotEmail = async (email: string): Promise<any> => {
     await Parse.User.requestPasswordEmail(email)
     return true
 }
 
-export const isLoggedIn = async():Promise<User | undefined> => {
+export const isLoggedIn = async (): Promise<User | undefined> => {
     const user = await Parse.User.current()
     return user && toUser(user)
 }
 
-function toUser(user:Parse.User): User {
+function toUser(user: Parse.User): User {
     return {
         firstName: user.get('FirstName'),
         lastName: user.get('LastName'),
@@ -297,7 +310,7 @@ function toUser(user:Parse.User): User {
     } as User
 }
 
-export const logout = async():Promise<any> => {
+export const logout = async (): Promise<any> => {
     await Parse.User.logOut()
     localStorage.clear()
     userLogout.next(true)

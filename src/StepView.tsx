@@ -24,8 +24,6 @@ export const StepView = ({children, hasError, sx}:StepProps) => {
         return "rgb(233,233,233)" 
     }
 
-    console.log(children)
-
     return (
         <Box sx={{
             position: "absolute",

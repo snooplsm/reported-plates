@@ -6,12 +6,12 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, Icon, Input, ThemeProvider, Paper, Portal, ToggleButton, ToggleButtonGroup, Typography, Avatar, Card, CardActionArea, Snackbar, Slide } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, Typography, CardActionArea, } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
-import { Complaint, ComplaintsView, ComplaintType } from './Complaints';
-import { StepView } from './StepProps';
+import { Complaint, ComplaintsView } from './Complaints';
+import { StepView } from './StepView';
 import { UserView } from './UserView'
 import { DetectionView } from './DetectionView';
 import FileUploadPreview from './FileUploadPreview';
@@ -32,21 +32,13 @@ import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
 
 function App() {
 
-  const [loading, setLoading] = useState({ text: "Loading OpenCV.js", progress: NaN });
-
-  const [submitting, setSubmitting] = useState(false)
-
   const [files, setFiles] = useState(new Set<File>())
   const [currentFile, setCurrentFile] = useState<number>()
   const [fileNames, setFileNames] = useState<Set<string>>(new Set())
 
   const [complaint, setComplaint] = useState<Complaint>()
 
-  const [boxes, setBoxes] = useState<DetectBox[]>()
-
   const [location, setLocation] = useState<GeoSearchResponse>()
-
-  const [feature, setFeature] = useState<Feature>()
 
   const [latLng, setLatLng] = useState<Number[]>()
 
@@ -54,19 +46,11 @@ function App() {
 
   const [showLoginModal, setShowLoginModal] = useState<[string, JwtPayload]>()
 
-  const [snack, setSnack] = useState<Report>()
-
   const [isSignedIn, setIsSignedIn] = useState<User>()
 
   const [dateOfIncident, setDateOfIncident] = useState<Date>()
 
-  const [loaded, setLoaded] = useState(false)
-
-  const [isDragging, setIsDragging] = useState(false);
-
-  const [dragComponent, setDragComponent] = useState<HTMLElement>()
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [, setLoaded] = useState(false)
 
   const [reportPreview, setReportPreview] = useState<Report>()
 
@@ -120,13 +104,10 @@ function App() {
   }
 
   const [plate, setPlate] = useState<PlateDetection>()
-  const [results, setResults] = useState<DetectBox[]>()
+  const [, setResults] = useState<DetectBox[]>()
   const [car, setCar] = useState<DetectBox>()
 
   const [reportDescription, setReportDescription] = useState<string>('')
-
-  type MediaType = 'blockedbikelane' | 'blockedcrosswalk' | 'ranredlight' | 'parkedillegally' | 'droverecklessly' | null;
-  const [selected, setSelected] = useState<MediaType>(null);
 
   useEffect(() => {
     const signedIn = async () => {
@@ -138,12 +119,11 @@ function App() {
 
   const handleSuccess = (credentialResponse: any) => {
     // Handle the successful login here
-    console.log('Google login successful', credentialResponse);
     login(credentialResponse, (accessToken: string, jwt: JwtPayload) => {
       setShowLoginModal([accessToken, jwt])
     })
-      .then(resp => {
-        setIsSignedIn(true)
+      .then(() => {
+        
       }).catch(e => {
         console.log(e)
       })
@@ -154,37 +134,13 @@ function App() {
     console.log('Google login failed');
   };
 
-  const handleSelection = (
-    event: React.MouseEvent<HTMLElement>,
-    newSelection: MediaType
-  ) => {
-    setSelected(newSelection);
-  };
-
-  const onLocationChange = (resp: GeoSearchResponse, feature: Feature) => {
-    setLatLng(feature.geometry.coordinates)
-    resp.features = [feature]
-    setLocation(resp)
-    setFeature(feature)
-  }
-
-  // Handle drag over event (to allow dropping)
-  const handleDragOver = (e: React.DragEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    setIsDragging(true);
-    if (e.target.value) {
-      setSelected(e.target.value)
-    }
-  };
-
   let initialized = false
 
   cv["onRuntimeInitialized"] = async () => {
-    console.log("initialized")
     if (!initialized) {
       initialized = true
     }
-    await downloadAll(setLoading)
+    await downloadAll(()=> {})
     setLoaded(true)
   }
 
@@ -314,7 +270,7 @@ function App() {
       if (data && data?.features?.[0]?.properties?.label?.length > 0) {
         reported.set(ReportedKeys.Geo, data, hash)
         setLocation(data)
-        setFeature(data.features[0])
+        // setFeature(data.features[0])
         setLatLng([latitude, longitude])
       }
     }
@@ -329,7 +285,7 @@ function App() {
           if (result) {
             const carWithPlates = result.filter(res => res.plate != null)
             setResults(carWithPlates)
-            setBoxes(carWithPlates)
+            // setBoxes(carWithPlates)
             if (carWithPlates && carWithPlates[0]) {
               const carWithPlate = carWithPlates[0]
               if (!car) {
@@ -371,7 +327,7 @@ function App() {
             "& > *": {
               marginTop: 1, // Apply margin to all children
             },
-            "& > *:first-child": {
+            "& > *::first-of-type": {
               marginTop: 0, // Apply margin to all children
             },
           }}
@@ -458,7 +414,6 @@ function App() {
 
                   const report = getReport()
 
-                  setSubmitting(true)
                   setReportPreview(report)
                   setShowReportPreview(true)
                 }}
@@ -477,7 +432,7 @@ function App() {
             "& > *": {
               marginTop: 1, // Apply margin to all children
             },
-            "& > *:first-child": {
+            "& > *::first-of-type": {
               marginTop: 0, // Apply margin to all children
             }
           }}
@@ -489,7 +444,7 @@ function App() {
           {currentFile != undefined && currentFile >= 0 &&
             <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
               setResults(result)
-              setBoxes(result)
+              // setBoxes(result)
               setCar(car)
               setPlate(car.plate!)
             }} />
@@ -501,7 +456,7 @@ function App() {
             "& > *": {
               marginTop: 1, // Apply margin to all children
             },
-            "& > *:first-child": {
+            "& > *::first-of-type": {
               marginTop: 0, // Apply margin to all children
             }
           }

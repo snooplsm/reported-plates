@@ -4,7 +4,7 @@ import { deleteReport, SimpleReport, Status } from './Auth';
 import moment from 'moment';
 import { IconButton, Menu, MenuItem } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import React, { useState } from 'react';
+import React from 'react';
 
 function formatCustomDate(date: Date, showAgo = true) {
     const now = moment();
@@ -36,7 +36,7 @@ interface ReportProps {
     statuses?: Map<Number, Status>
 }
 
-export default function ReportsTable({ reports, onReports = (reports) => {}, statuses, onReportClicked = (report) => { } }: ReportProps) {
+export default function ReportsTable({ reports, onReports = () => {}, statuses, onReportClicked = () => { } }: ReportProps) {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
     const handleClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -86,7 +86,7 @@ export default function ReportsTable({ reports, onReports = (reports) => {}, sta
                                     onReports(newReports)
                                 }
                                 handleClose()
-                            }).catch(k=> {
+                            }).catch(()=> {
                                 handleClose()
                             })
                         }}>
@@ -106,13 +106,13 @@ export default function ReportsTable({ reports, onReports = (reports) => {}, sta
         ,
         {
             field: 'status', headerName: 'Status', width: 140,
-            valueGetter: (value: any, row: any) => {
+            valueGetter: (value: any) => {
                 return statuses && statuses.get(value)?.text || "Not yet submitted"
             },
         },
         { field: 'reqnumber', headerName: '311#', width: 140 },
         { field: 'license', headerName: 'License #', 
-            valueGetter: (value: any, row: any) => {
+            valueGetter: (_: any, row: any) => {
                 return `${row.license}:${row.state}`
             },
             width: 150 },
@@ -120,14 +120,14 @@ export default function ReportsTable({ reports, onReports = (reports) => {}, sta
         {
             field: 'timeofreport',
             headerName: 'Date',
-            valueGetter: (value: any, row: any) => {
+            valueGetter: (value: any) => {
                 return formatCustomDate(value, true)
             },
             width: 400,
         },
         {
             field: 'files', headerName: 'Photos', width: 100,
-            valueGetter: (value: any, row: any) => value.length
+            valueGetter: (value: any) => value.length
 
         }
     ];

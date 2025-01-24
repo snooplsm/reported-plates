@@ -14,8 +14,8 @@ interface HowToGuideProps {
     videoUrl: string; // URL of the 1:1 video for Step 1
     onStepHovered?: (step?: Steps) => void
     isSignedIn: boolean,
-    handleSuccess: (credential:any) => void
-    handleError: () =>void
+    handleSuccess: (credential: any) => void
+    handleError: () => void
 
 }
 
@@ -92,9 +92,9 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                     padding: 2,
                 }}
             >
-            <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
-                How to Submit a Vehicle Complaint
-            </Typography>
+                <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
+                    How to Submit a Vehicle Complaint
+                </Typography>
                 {/* <Typography variant="h5" >
                     Steps:
                 </Typography> */}
@@ -150,7 +150,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step++}</Avatar>Take a photo of the infraction</Stack>}
+                            }}>{step++}</Avatar>Take a photo of the infraction</Stack>}
                             secondary="Be sure to include the vehicle's license plate to take advantage of our license plate reader."
                         />
                         <Box
@@ -199,7 +199,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step++}</Avatar>Add photos</Stack>}
+                            }}>{step++}</Avatar>Add photos</Stack>}
                             secondary="We support drag-and-drop or manual uploads for your convenience.  Drag an image over the complaint."
                         />
                         <Box
@@ -218,7 +218,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 overflow: 'auto',
                             }}
                         >
-                            <ComplaintsView onChange={()=>{}} onFiles={() => { }} />
+                            <ComplaintsView onChange={() => { }} onFiles={() => { }} />
                         </Box>
                     </ListItem>
                     <ListItem
@@ -234,7 +234,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 boxShadow: 3,
                                 marginRight: 2,
                                 fontSize: "90%"
-                              }}>{step++} - {(step+=1)}</Avatar>Extract key details</Stack>}
+                            }}>{step++} - {(step += 1)}</Avatar>Extract key details</Stack>}
                             secondary="The license plate will be extracted from the photo, along with the location and time of the infraction."
                         />
                         <Box
@@ -250,13 +250,18 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                     </ListItem>
                     <ListItem onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>
                         <ListItemText
-                            primary={<Stack direction="row" alignItems="center"><Avatar sx={{
-                                bgcolor: "rgb(250,221,152)",
-                                color: "rgb(0,0,0)",
-                                boxShadow: 3,
-                                marginRight: 2
-                              }}>{step+=1}</Avatar>Verify and submit.</Stack>}
-                            secondary={<ol type="i" style={{
+                            primary={
+                                <Stack direction="row" alignItems="center">
+                                    <Avatar sx={{
+                                        bgcolor: "rgb(250,221,152)",
+                                        color: "rgb(0,0,0)",
+                                        boxShadow: 3,
+                                        marginRight: 2
+                                    }}>{step += 1}
+                                    </Avatar>Verify and submit.
+                                </Stack>}
+                            secondary={
+                            <div><ol type="i" style={{
                                 marginLeft: 32
                             }}>
                                 {[
@@ -264,11 +269,12 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                     <><b>License Plate and State:</b> Verify the license plate and state match the photo, if applicable</>,
                                     <><b>Incident Address:</b> Ensure the address matches the location where the photo was taken</>,
                                     <><b>Time of Incident:</b> Double-check the reported time of the incident for accuracy</>,
-                                    <>Once verified, submit the report and pledge to testify if required</>                            
+                                    <>Once verified, submit the report and pledge to testify if required</>
 
-                                ].map(x=><li>{x}.</li>)}
-                                
-                            </ol>}
+                                ].map((x,index) => <li key={`lineitem_${index}`}>{x}.</li>)}
+
+                            </ol></div>}
+                            disableTypography={true}
                         />
                     </ListItem>
                     <ListItem>
@@ -278,10 +284,10 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 color: "rgb(0,0,0)",
                                 boxShadow: 3,
                                 marginRight: 2
-                              }}>{step+=1}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
+                            }}>{step += 1}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
                             secondary={
                                 <>
-                                Our slack channel is a great resource to learn the process of filing complaints with the TL&C
+                                    Our slack channel is a great resource to learn the process of filing complaints with the TL&C
                                 </>
                             }
                         />
@@ -289,7 +295,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                 </List>
             </Paper>
         </Box>
-        
+
         </>
     );
 };
