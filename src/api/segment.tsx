@@ -377,27 +377,19 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             // const rotate = cv.getRotationMatrix2D(center, -angle, 1.0)
                             // cv.warpAffine(roi, roi, rotate, new cv.Size(roi.cols,roi.rows), cv.INTER_LINEAR)
                         }
-                        console.log("the nagle is ", angle)
                                     
 
                         const src = await blobToMat(blob)
                         const matC3 = new cv.Mat(); // new image matrix
                         cv.cvtColor(src, matC3, cv.COLOR_BGR2GRAY); // RGBA to BGR
                         const [w3, h3] = divStride(32, matC3.cols, matC3.rows);
-                        cv.resize(matC3, matC3, new cv.Size(w3, h3))
-                        const maxSize = Math.max(matC3.rows, matC3.cols)
-                        const xPad = maxSize - matC3.cols;
-                        // const xRatio = maxSize / matC3.cols;
-                        const yPad = maxSize - matC3.rows;
-                        // const yRatio = maxSize / matC3.rows;
-                        // const width_scale1 = src.cols / 140
-                        // const height_scale1 = src.rows / 70
+                        cv.resize(matC3, matC3, new cv.Size(w3, h3))                    
+                        
                         const matPad = matC3.clone()
-                        // cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
+                        
                         cv.resize(matPad, matPad, new cv.Size(140, 70))
 
                         const input = new Uint8Array(matPad.data);
-                        // src.delete();
                         roi.delete()
                         matC3.delete();
                         matPad.delete();
@@ -413,7 +405,6 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         // Create the tensor
                         const tensor = new Tensor("uint8", tensorData, tensorShape);
                         const { concatenate } = await ocr.run({ input: tensor })
-                        console.log("concat", concatenate.data)
                         // const totalElements = concatenate.data.length;
                         const alphabetLength = alphabet.length;
                         const batchSize = slots * alphabetLength;
@@ -457,16 +448,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                                 averageProbability, // Average probability of the plate
                             });
                         }
-
-                        // Step 4: Output
-                        console.log("Plates with Probabilities:", platesWithProbabilities);
-                        
-
-                        // console.log(concatenate)
-                        //MAGIC
-
                         const matC4 = await blobToMat(blob)
-                        // cv.cvtColor(src, matC4, cv.COLOR_RGBA2BGR); // RGBA to BGR
                         cv.resize(matC4, matC4, new cv.Size(160, 160), 0, 0, cv.INTER_LINEAR);
                         matC4.convertTo(matC4, cv.CV_32F, 1 / 255.0); // Normalize to [0, 1]       
                         cv.cvtColor(matC4, matC4, cv.COLOR_RGBA2RGB);
@@ -498,13 +480,6 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                         );
                         const label = maxProbIndex + 4
                         const maxProbability = classProbabilities[maxProbIndex];
-
-                        // Log the decoded results
-                        console.log("Bounding Box:");
-                        console.log(`  x_center: ${xCenter}, y_center: ${yCenter}`);
-                        console.log(`  width: ${width}, height: ${height}`);
-                        console.log(`Most likely class index: ${label}, ${yoloClassIndexToLabel[label]}`);
-                        console.log(`Probability of the class: ${maxProbability}`);
                         const plateProb = platesWithProbabilities[0] || null
                         
                         if(box.plate) {
@@ -513,7 +488,7 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                             plate.textWithUnderscores = plateProb.plate
                             plate.textAvgProb = plateProb.averageProbability
                             plate.textLetterProb = plateProb.probabilities
-                            plate.state = yoloClassIndexToLabel[label].split("_")[0]
+                            plate.state = yoloClassIndexToLabel[label].split("_")[0] as State
                             plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
                             plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
                             plate.stateConfidence = maxProbability
@@ -549,7 +524,6 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 return bHasText - aHasText; // Higher value (bHasText) comes first
             })
             resolve(boxes)
-            console.log(boxes)
         }
 
     })
@@ -592,7 +566,6 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     // Create the tensor
     const tensor = new Tensor("uint8", tensorData, tensorShape);
     const { concatenate } = await ocr.run({ input: tensor })
-    console.log("concat", concatenate.data)
     // const totalElements = concatenate.data.length;
     const alphabetLength = alphabet.length;
     const batchSize = slots * alphabetLength;
@@ -678,19 +651,14 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     const label = maxProbIndex + 4
     const maxProbability = classProbabilities[maxProbIndex];
 
-    // Log the decoded results
-    // console.log("Bounding Box:");
-    // console.log(`  x_center: ${xCenter}, y_center: ${yCenter}`);
-    // console.log(`  width: ${width}, height: ${height}`);
-    // console.log(`Most likely class index: ${label}, ${yoloClassIndexToLabel[label]}`);
-    // console.log(`Probability of the class: ${maxProbability}`);
+    
     const plateProb = platesWithProbabilities[0] || null
     const plate = {} as PlateDetection
     plate.text = plateProb.plate.split("").filter(x=>x!=='_').join("")
     plate.textWithUnderscores = plateProb.plate
     plate.textAvgProb = plateProb.averageProbability
     plate.textLetterProb = plateProb.probabilities
-    plate.state = yoloClassIndexToLabel[label].split("_")[0]
+    plate.state = yoloClassIndexToLabel[label].split("_")[0] as State
     plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
     plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
     plate.stateConfidence = maxProbability
@@ -709,22 +677,6 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     console.log(plate)
     matC4.delete()
     return plate
-}
-
-function detectPrimaryColor(image:Mat) {
-    let lower = [175, 118, 30, 0];
-    let higher = [255, 195, 25, 255];
-    let dst = new cv.Mat();
-    let low = new cv.Mat(image.rows, image.cols, image.type(), lower);
-    let high = new cv.Mat(image.rows, image.cols, image.type(), higher);
-    cv.inRange(image, low, high, dst);
-    const count = cv.countNonZero(dst)
-    if(count>30) {
-        return "Orange"
-    } else {
-        return "White"
-    }
-    dst.delete(); low.delete(); high.delete(); 
 }
 
 type BoundingBox = {
@@ -775,10 +727,6 @@ function convertToDetectionResult(
 
         // Only include results that meet the score threshold
         if (score < scoreThreshold) continue;
-
-        console.log("ratioX:", ratio[0], "ratioY:", ratio[1]);
-        console.log("paddingX:", padding[0], "paddingY:", padding[1]);
-        console.log("x1:", bbox[0], "x2:", bbox[1], "y1:", bbox[2], "y2:", bbox[3]);
 
         // Adjust bounding box from scaled image back to original image size
         bbox[0] = (bbox[0] - padding[0]) / ratio[0];

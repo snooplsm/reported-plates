@@ -15,8 +15,14 @@ import { LoadingButton } from '@mui/lab'
 import { forgotEmail, loginWithPassword, User } from './Auth';
 import { JwtPayload } from 'jwt-decode';
 
+export interface CustomJwtPayload extends JwtPayload {
+  email: string; 
+  given_name: string;
+  family_name: string;
+}
+
 type LoginModalProps = {
-  payload?:[string,JwtPayload],
+  payload?:[string,CustomJwtPayload],
   open: boolean;
   onClose: () => void;
   onLoggedIn: (user:User)=>void;
@@ -102,10 +108,9 @@ const LoginModal = ({
       <DialogActions>
         <LoadingButton
           loading={loading}
-          // type="submit"
+          type="submit"
           disabled={loading}
           variant="contained"
-          onClick={handleSubmit}
           sx={{ mt: 3, mb: 2 }}
         >
           Login

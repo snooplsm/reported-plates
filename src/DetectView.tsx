@@ -9,15 +9,11 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import cv from "@techstark/opencv-js";
 import heic2any from "heic2any";
 import FilterCenterFocusIcon from '@mui/icons-material/FilterCenterFocus';
-import { Feature, GeoSearchResponse } from './api/ny/nyc/nyc';
 
 type DetectProps = {
     file: File; // The title displayed on the card
     boxes?: DetectBox[],
     onPlate?: (plate: PlateDetection) => void,
-    onLocationChange?: (resp: GeoSearchResponse, feature: Feature) => void
-    location?: GeoSearchResponse,
-    latLng?: Number[]
     onCarWithPlate?:(result:DetectBox[], car: DetectBox) => void
 };
 
@@ -28,11 +24,10 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
-const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, location, latLng }:DetectProps) => {
+const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate }:DetectProps) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
-    const [plateOverride, setPlateOverride] = useState<PlateDetection>()
 
     const [scale, setScale] = useState<number>(1); // Track zoom level
     const [offsetX, setOffsetX] = useState(0);
@@ -51,7 +46,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
     const [selectedOption, setSelectedOption] = useState<CanvasOption | null>(CanvasOption.Pan);
     const [cursor, setCursor] = useState<string>("grab")
 
-    const handleToggle = (event: React.MouseEvent<HTMLElement>, newOption: CanvasOption | null) => {
+    const handleToggle = (_event: React.MouseEvent<HTMLElement>, newOption: CanvasOption | null) => {
         console.log(newOption)
         if (newOption !== null) {
             setSelectedOption(newOption);
@@ -72,7 +67,9 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
     const [boundingBox, setBoundingBox] = useState<[x1: number, y1: number, x2: number, y2: number]>()
 
     const onMouseDown = (e: React.MouseEvent) => {
-        // console.log("onMouseDown")
+        if(!canvasRef.current) {
+            return
+        }
         e.preventDefault()
         if (selectedOption === CanvasOption.Label) {
             setIsDragging(true)
@@ -81,6 +78,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
             setIsPanning(true)
         }
         const rect = e.currentTarget.getBoundingClientRect();
+
         const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
         const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
 
@@ -95,44 +93,39 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
         console.log("position changed", position)
     }, [position])
 
-    const onMouseUp = (e: React.MouseEvent) => {
+    const onMouseUp = () => {
         if (isDragging && boundingBox) {
+            if(!canvasRef.current) {
+                return
+            }
+            if(!imgRef.current) {
+                return
+            }
+            if(!imageSrc) {
+                return
+            }
             const rect = canvasRef.current.getBoundingClientRect();
             const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
             const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-            const scaleX3 = imgRef.current.naturalWidth / rect.width
-            const scaleY3 = imgRef.current.naturalHeight / rect.height
             const bbox = boundingBox
-            const bbox2 = bbox.map(x => x * scale);
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
             const image = new Image()
             image.src = imageSrc
             image.onload = async () => {
                 console.log(bbox)
                 const mat = cv.imread(image)
-                console.log("bounding box", bbox)
-                // console.log("boudning box2", bbox2)
-                const offsetX1 = offsetX / 100
-                const offsetY1 = offsetX / 100
+
                 const width = mat.cols
                 const height = mat.rows
                 const scaleX2 = rect.width / width; // Horizontal scaling factor
                 const scaleY2 = rect.height / height; // Vertical scaling factor
-                console.log("up", `size: ${width}x${height}`,
-                    "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4) + "%", "offsetY:",
-                    offsetY.toFixed(4) + "%", "scale:", scale.toFixed(4), "rect:", rect, "bbox:", boundingBox.map(x => x.toFixed(4)))
-                console.log("x", x, "y", y)
                 const scaledBox = bbox.map((x, i) => {
                     const scale = (i % 2 === 0) ? scaleX : scaleY; // Determine scale based on index
                     return x / scale; // Apply scaling
                 });
-                console.log("scaledBox", scaledBox)
                 const x1 = scaledBox[0] / scaleX2
                 const y1 = scaledBox[1] / scaleY2
                 const x2 = scaledBox[2] / scaleX2
                 const y2 = scaledBox[3] / scaleY2
-                // const y2 = (offsetY / 100) * height - bbox[3]* offsetX/100
                 console.log(x1, y1, x2, y2)
                 const rectRoi = new cv.Rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1))
                 console.log(rectRoi)
@@ -140,19 +133,18 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
                 cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
                 mat.delete()
                 const plate = await detectPlate(roi)
-                setPlateOverride(plate)
-                console.log("plate", plate)
+                // setPlateOverride(plate)
                 roi.delete()
-                // URL.revokeObjectURL(image.src)
             }
-
-
         }
         setIsDragging(false)
         setIsPanning(false)
     }
 
     const onMouseMove = (e: React.MouseEvent) => {
+        if(!canvasRef.current) {
+            return
+        }
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
         const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
@@ -165,18 +157,16 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
             // console.log("pressed", "x:",x.toFixed(4), "y:",y.toFixed(4), 
             // "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4)+"%", "offsetY:",
             // offsetY.toFixed(4)+"%", "scale:", scale.toFixed(4), "rw:",rect.width.toFixed(4), "rh:",rect.height.toFixed(4), "rl:", rect.left.toFixed(4), "rt:",rect.top.toFixed(4))
-            const box = [position[0], position[1], x, y]
+            const box:[x1: number, y1: number, x2: number, y2: number] = [position[0], position[1], x, y]
             console.log("box", box, "width", rect.width)
             setBoundingBox(box)
         } else if (isPanning) {
-            // console.log("not pressed", x, y)
             console.log("isPanning")
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
 
             const dx = (position[0] - x) / scale;
             const dy = (position[1] - y) / scale;
-            console.log("panning at scale", scale, dx, dy)
             setOffsetX((prevOffsetX) => prevOffsetX + dx);
             setOffsetY((prevOffsetY) => prevOffsetY + dy);
 
@@ -192,16 +182,11 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
     }, [offsetX, offsetY])
 
     const handleWheel = (e: WheelEvent) => {
-        console.log("wheel")
         e.preventDefault();
 
         const newScale = scale + e.deltaY * -0.004; // Adjust scale
         setScale(Math.min(Math.max(newScale, 1), 8)); // Clamp zoom level between 1x and 5x
     };
-
-    const onLocationSearch = (rep: GeoSearchResponse, value: Feature) => {
-        onLocationChange?.(rep, value)
-    }
 
     useEffect(() => {
         const fetchImage = async () => {
@@ -214,7 +199,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
                     const converted = await heic2any({
                         blob,
                         toType: "image/jpeg",
-                    });
+                    }) as Blob;
                     file2Use = URL.createObjectURL(converted);
                 } catch (e) {
                     console.log(e);
@@ -260,24 +245,14 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
         if (canvas == null) {
             return
         }
-        // console.log(boundingBox)
         const draw = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // console.log("clear",0,0,canvas.width,canvas.height)
             if (!boundingBox) {
                 return
             }
-            // ctx.save();
-
-            // Apply transformations
-            // ctx.scale(scale, scale);
-            // ctx.translate(offsetX / scale, offsetY / scale);
-            // console.log("drawing", boundingBox)
-            // Example: Draw a rectangle
+            
             ctx.imageSmoothingEnabled = false;
-            ctx.fillStyle = "#8F00FF88";
-            // ctx.fillRect()
-            // console.log("drawing",boundingBox[0], boundingBox[1], boundingBox[2]-boundingBox[0], boundingBox[3]-boundingBox[1])
+            ctx.fillStyle = "#8F00FF88";            
             ctx.fillRect(boundingBox[0], boundingBox[1], boundingBox[2] - boundingBox[0], boundingBox[3] - boundingBox[1]); // Coordinates are transformed
             ctx.beginPath()
             ctx.arc(canvas.width / 2, canvas.height / 2, 1, 0, 360)
@@ -313,7 +288,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
                     onMouseMove={onMouseMove}
                 >
 
-                    <img
+                    {imageSrc && <img
                         ref={imgRef}
                         src={imageSrc}
                         style={{
@@ -325,7 +300,7 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
                             display: "block", // Prevent inline-block issues
                             cursor: cursor,
                         }}
-                    />
+                    />}
                     <canvas
                         ref={canvasRef}
                         style={{
@@ -381,8 +356,6 @@ const DetectView= ({ file, boxes, onPlate, onLocationChange, onCarWithPlate, loc
                     </IconButton>
                 </Tooltip>
                 </Box>
-                {/* <GeoSearchAutocomplete initial={location} onChange={onLocationSearch} /> */}
-                {/* <MapPickerView latLng={latLng} location={location} /> */}
             </Paper>
         )
 }

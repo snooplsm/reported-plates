@@ -9,10 +9,10 @@ import Box from '@mui/material/Box';
 import { Button, CssBaseline, ThemeProvider, Paper, Typography, CardActionArea, } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
-import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
+import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import { Complaint, ComplaintsView } from './Complaints';
 import { StepView } from './StepView';
-import { UserView } from './UserView'
+import { UserView, UserViewRef } from './UserView'
 import { DetectionView } from './DetectionView';
 import FileUploadPreview from './FileUploadPreview';
 import HowToGuide, { Steps } from './HowToGuide';
@@ -22,12 +22,13 @@ import 'react-clock/dist/Clock.css';
 import { BasicDateTimePicker } from './BasicDateTimePicker';
 import { MapPickerView } from './MapPickerView';
 import { JwtPayload } from 'jwt-decode';
-import LoginModal from './LoginModal';
+import LoginModal, { CustomJwtPayload } from './LoginModal';
 import { isLoggedIn, login, Report, ReportErrors, userLogin, userLogout, User } from './Auth';
 import TextArea from './TextArea';
 import { SubmissionPreview } from './SubmissionPreview';
 import { classifyVehicle } from './classifyVehicle';
 import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
+import { LargeDragDropView } from './LargeDragDropView';
 
 
 function App() {
@@ -44,7 +45,7 @@ function App() {
 
   const [hoveredStep, setHoveredStep] = useState<Steps | undefined>()
 
-  const [showLoginModal, setShowLoginModal] = useState<[string, JwtPayload]>()
+  const [showLoginModal, setShowLoginModal] = useState<[string, CustomJwtPayload]>()
 
   const [isSignedIn, setIsSignedIn] = useState<User>()
 
@@ -57,6 +58,8 @@ function App() {
   const [showReportPreview, setShowReportPreview] = useState(false)
 
   const [reportError, setReportError] = useState<Set<ReportErrors>>()
+
+  const userRef = useRef<UserViewRef|null>(null)
 
   const clearState = () => {
     setFiles(new Set())
@@ -104,10 +107,12 @@ function App() {
   }
 
   const [plate, setPlate] = useState<PlateDetection>()
-  const [, setResults] = useState<DetectBox[]>()
+  const [results, setResults] = useState<DetectBox[]>()
   const [car, setCar] = useState<DetectBox>()
 
   const [reportDescription, setReportDescription] = useState<string>('')
+
+  const [showDragView, setShowDragView] = useState(false)
 
   useEffect(() => {
     const signedIn = async () => {
@@ -119,7 +124,7 @@ function App() {
 
   const handleSuccess = (credentialResponse: any) => {
     // Handle the successful login here
-    login(credentialResponse, (accessToken: string, jwt: JwtPayload) => {
+    login(credentialResponse, (accessToken: string, jwt: CustomJwtPayload) => {
       setShowLoginModal([accessToken, jwt])
     })
       .then(() => {
@@ -193,6 +198,9 @@ function App() {
     const user = isSignedIn
     if (user == undefined) {
       err.add(ReportErrors.NOT_LOGGED_IN)
+      if(userRef.current) {
+        userRef.current.refreshUserAvatar()
+      }
     }
     if (err.size > 0) {
       setReportError(err)
@@ -223,7 +231,8 @@ function App() {
   }
 
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
-    if (filez) {
+    setShowDragView(false)
+    if (filez && filez.length>0) {
       const newFiles = new Set<File>(files)
       filez.forEach(file => {
         if (!fileNames.has(file.name)) {
@@ -307,8 +316,10 @@ function App() {
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box width="100%"><UserView isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
+      {showDragView && <LargeDragDropView onFiles={onFiles}/>}
+      <Box width="100%"><UserView ref={userRef} isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
+        
         display="flex"
         sx={{
           "& > *": {
@@ -316,6 +327,10 @@ function App() {
           },
         }}
         height="100vh"
+        onDragOver={(e)=> {
+          // e.preventDefault()
+          setShowDragView(true)
+        }}
       >
         {/* Left Column */}
         <Box
@@ -387,7 +402,12 @@ function App() {
               <Box sx={{
                 // marginLeft: 2
               }}>
-                <DetectionView onPlateChange={onPlate} plate={plate} />
+                <DetectionView boxes={results} onPlateChange={onPlate} onCarWithPlate={(results, plate)=> {
+                  setResults(results)
+                  // setBoxes(result)
+                  setCar(plate)
+                  setPlate(plate.plate!)
+                }} plate={plate} />
               </Box>
               <StepView hasError={reportError && (reportError.has(ReportErrors.MISSING_PLATE) || reportError.has(ReportErrors.MISSING_PLATE_STATE))}>
                 {step++}</StepView>
@@ -500,11 +520,10 @@ function App() {
             open={showLoginModal != undefined}
             payload={showLoginModal}
             onLoggedIn={(user) => {
-              setIsSignedIn(true)
+              setIsSignedIn(user)
               setShowLoginModal(undefined)
             }}
             onClose={() => {
-              console.log("close")
               setShowLoginModal(undefined)
             }
             } />}
@@ -537,8 +556,8 @@ function App() {
             }}
             open={showReportPreview}
             report={reportPreview} />}
-        <SnackbarProvider/>
-      </Box>
+        <SnackbarProvider/>                
+      </Box>            
     </ThemeProvider>
   )
 }

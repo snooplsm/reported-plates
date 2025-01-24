@@ -1,5 +1,5 @@
-import { GoogleLogin } from "@react-oauth/google"
-import { useEffect, useState } from "react"
+import { GoogleLogin, useGoogleLogin } from "@react-oauth/google"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { BasicSpeedDial } from "./BasicSpeedDial"
 import { Box } from "@mui/material"
 import { useNavigate } from "react-router-dom"
@@ -10,11 +10,21 @@ export interface UserProps {
     handleError: () => void
 }
 
-export const UserView = ({ isSignedIn, handleSuccess, handleError }: UserProps) => {
+export interface UserViewRef {
+    refreshUserAvatar: () => void;
+  }
 
-    const [avatar, setAvatar] = useState<string>('')    
+export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handleSuccess, handleError }, ref) => {
+
+    const [avatar, setAvatar] = useState<string>('')  
 
     const nav = useNavigate()
+
+    useImperativeHandle(ref, () => ({
+        refreshUserAvatar: () => {
+            alert('You need to sign in.  Click sign in with google.')
+        },
+      }));
 
     useEffect(() => {
         if (isSignedIn) {
@@ -58,15 +68,15 @@ export const UserView = ({ isSignedIn, handleSuccess, handleError }: UserProps) 
                 right: 0
             }}
         >
-            <>{!isSignedIn && <GoogleLogin
-                shape="pill"
+            <>{!isSignedIn && <Box component={"div"} id="googlelogin"><GoogleLogin
+                shape="pill"                
                 onSuccess={handleSuccess}
                 onError={handleError}
             // Optionally, you can customize the button appearance and behavior
-            />}
+            /></Box>}
             {isSignedIn && <BasicSpeedDial avatarUrl={avatar} />}</>
         
         </Box>        
 
     </Box>)
-}
+})

@@ -78,7 +78,6 @@ export interface ComplaintProps {
 const handleDrop = (onFiles: (complaint: Complaint, files: File[]) => void, complaint: Complaint, e: React.DragEvent<HTMLDivElement>) => {
   // console.log("handle drop")
   e.preventDefault();
-
   // e.stopPropagation();
   const files = Array.from(e.dataTransfer.files)
   if (files.length > 0) {
@@ -124,9 +123,10 @@ interface ComplaintsProps {
   showCaption?: boolean,
   selectedComplaint?: Complaint
   onChange: (complaint?: Complaint) => void
+  hideUpload?:boolean
 }
 
-export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hoveredStep, showCaption }: ComplaintsProps) => {
+export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hideUpload=false, hoveredStep, showCaption }: ComplaintsProps) => {
 
   const inputRef = useRef<HTMLInputElement>()
 
@@ -226,6 +226,10 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
                 key={item.type + "_" + index}
                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                   e.preventDefault()
+                  console.log("drag over")
+                }}
+                onDragEnd={()=> {
+                  console.log("drag end")
                 }}
                 onDragEnter={(e: DragEvent) => {
                   // console.log("drag enter")
@@ -262,7 +266,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
               ><ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} /></Paper>
             )
           })}
-          <Paper
+          {hideUpload!=true && <Paper
             elevation={3}
             onClick={()=> {
               inputRef.current?.click()
@@ -310,7 +314,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hov
             >
               upload <br />or<br />drag & drop<br />jpeg, heic
             </Box>
-          </Paper>
+          </Paper>}
         </Box>
       </Box>
       {showCaption && <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>}

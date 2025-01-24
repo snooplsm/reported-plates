@@ -1,29 +1,30 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Box, FormControl, Menu, MenuItem, Select, TextField, Tooltip, Typography } from "@mui/material";
+import { useEffect, useRef, useState } from "react";
+import { Box,  Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
 import { PlateDetection, refinePlateForTLC } from "./api/segment";
-import { NYSTATE, State, StatePres, states } from "./States";
+import { NYSTATE, State,  StatePres,  states } from "./States";
 
 type LicensePlateProps = {
   plate?: PlateDetection; // The text on the license plate
-  onPlateChange: (plate:PlateDetection) => void
+  onPlateChange?: (plate:PlateDetection) => void
 };
 
-const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
+const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
 
   const [color, setColor] = useState(NYSTATE.plate.color)
-  const [bgColor, setBgColor] = useState(NYSTATE.plate.bg)
-  const anchorRef = useRef<HTMLElement>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
   const [bottomText, setBottomText] = useState("")
   const [bottomTextColor, setBottomTextColor] = useState(NYSTATE.bottom.color)
   const [bottomBgColor, setBottomBgColor] = useState(NYSTATE.bottom.bg)
-  const [fontSize, setFontSize] = useState("")
   const [plateText, setPlateText] = useState("")
   const [menuOpen,setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLElement>()
-
-  const stateRef = useRef<HTMLSelectElement>(null)
 
   const [plateState, setPlateState] = useState(NYSTATE)
+
+  const handleMenuItemClick = (state:StatePres) => {
+    setPlateState(state);
+    setMenuOpen(false);
+  };
+
 
   useEffect(() => {
     setPlateText(plate?.text || "NONE")
@@ -33,26 +34,19 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
   }, [plate]);
 
   useEffect(() => {
-    let fontSize = "3.9rem";
-    if (plateText.length > 6) {
-      fontSize = "3.2rem";
-    }
     const font = plateState.plate.color || "#000";
-    const bg = plateState.plate.bg || "#FFF"
     const bottomBgColor = plateState.bottom.bg || "";
     const bottomTextColor = plateState.bottom.color || "";
     setBottomTextColor(bottomTextColor);
     setBottomBgColor(bottomBgColor);
     let bottomText = plateState.bottom.text
     if (typeof bottomText != 'string') {
-      const [licensePlate, tlc] = refinePlateForTLC(plateText)
+      const [, tlc] = refinePlateForTLC(plateText)
       const func = bottomText as (tlc: boolean) => string
       bottomText = func(tlc || plate?.tlc || false)
     }
     setColor(font);
-    setBgColor(bg);
     setBottomText(bottomText);
-    setFontSize(fontSize)
     if(plate) {
       plate.plateOverride = plateText
       plate.state = plateState.state
@@ -181,47 +175,67 @@ const LicensePlate = ({ plate, onPlateChange }: LicensePlateProps) => {
       </>}
 
       <Box
-        id="plate"        
-        sx={{
-          position: 'relative',
-          top: "0",
-          width: "100%",
-          zIndex: 2,
-          // alignItems: "center",
-          // justifyContent: "center",
+      id="plate"
+      sx={{
+        position: "relative",
+        top: 0,
+        width: "100%",
+        zIndex: 2,
+        height: "30%", // Adjust thickness
+        background: plateState.top.bg, // Background color
+      }}
+    >
+      <Tooltip title="Click to change" placement="top">
+        <Typography
+          ref={anchorRef}
+          onClick={()=>setMenuOpen(true)}
+          sx={{
+            fontSize: "1.33vw",
+            color: plateState.top.color,
+            height: "100%",
+            paddingTop: ".1vh",
+            textAlign: "center",
+            whiteSpace: "nowrap", // Prevent text wrapping
+            width: "100%",
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+        >
+          {`${plateState.top.text}`}
+        </Typography>
+      </Tooltip>
 
-          height: "30%", // Adjust thickness
-          background: plateState.top.bg, // Blue color
+      <Menu
+        open={menuOpen}
+        anchorEl={anchorRef.current}
+        onClose={()=> setMenuOpen(false)}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "center",
         }}
-      > {true &&<><Tooltip title="Click to change" placement="top"><Typography
-        ref={anchorRef}
-        onClick={()=> {
-          setMenuOpen(true)
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "center",
         }}
-        sx={{
-          fontSize: "1.33vw",
-          color: plateState.top.color,
-          height: "100%",
-          paddingTop: ".1vh",
-          textAlign: "center",
-          textWrap: "nowrap",
-          width: "100%",
-          cursor: "pointer",
-          fontWeight: 600,
-        }}
-      >{plateState.top.text}</Typography></Tooltip></>}
-        {<Menu open={menuOpen} anchorEl={anchorRef} onClose={()=> setMenuOpen(false)}>
-
-            {states.map((state, index) => <MenuItem onClick={()=> {setPlateState(state); setMenuOpen(false)}} key={`${state.state}_${index}`} value={state}><Typography
+      >
+        {states.map((state, index) => (
+          <MenuItem
+            onClick={() => handleMenuItemClick(state)}
+            key={`${state.state}_${index}`}
+            value={state.state}
+          >
+            <Typography
               sx={{
                 fontSize: "1.5rem",
                 fontWeight: 600,
               }}
             >
-              {state.top.text as string}
-            </Typography></MenuItem>)}
-          </Menu>}
-          </Box>
+              {`${state.top?.text || "No Text"}`}
+            </Typography>
+          </MenuItem>
+        ))}
+      </Menu>
+    </Box>
       {/* Bottom Yellow Line */}
       <Box
         sx={{

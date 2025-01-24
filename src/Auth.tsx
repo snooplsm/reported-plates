@@ -4,6 +4,7 @@ import { jwtDecode, JwtPayload } from "jwt-decode";
 import { ComplaintType } from './Complaints';
 import { Feature } from './api/ny/nyc/nyc';
 import { Subject } from 'rxjs';
+import { CustomJwtPayload } from './LoginModal';
 
 const PARSE_APPLICATION_ID = 'jkAZF8ojV4vOGnhSBjdwiMWBKpWML5tM4SWGKgOV';
 const PARSE_HOST_URL = 'https://parseapi.back4app.com/';
@@ -150,10 +151,10 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     } as SimpleReport
 }
 
-export const login = async (response: any, onAlreadyExists: (accessToken: string, decoded: JwtPayload) => void): Promise<User | undefined> => {
+export const login = async (response: any, onAlreadyExists: (accessToken: string, decoded: CustomJwtPayload) => void): Promise<User | undefined> => {
     const accessToken = response.credential
     const current = await Parse.User.current()
-    const decoded = jwtDecode(accessToken);
+    const decoded = jwtDecode(accessToken) as CustomJwtPayload;
     const userEmail = decoded.email
     console.log(decoded)
     const userGoogleId = decoded.sub

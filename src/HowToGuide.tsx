@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemText, Button, Avatar, Stack } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Box, Typography, Paper, List, ListItem, ListItemText, Avatar, Stack } from '@mui/material';
 import { ComplaintsView } from './Complaints';
 import LicensePlate from './LicensePlate';
 
@@ -19,12 +19,12 @@ interface HowToGuideProps {
 
 }
 
-const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handleError }: HowToGuideProps) => {
+const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [direction, setDirection] = useState<'down' | 'up'>('down');
 
-    const [canScroll, setCanScroll] = useState(true)
+    const [,setCanScroll] = useState(true)
 
     useEffect(() => {
         const userAgent = navigator.userAgent;
@@ -34,32 +34,32 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
     }, []);
 
 
-    useEffect(() => {
-        if (!canScroll) {
-            return
-        }
-        const interval = setInterval(() => {
-            if (scrollRef.current) {
-                const maxScroll = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
+    // useEffect(() => {
+    //     if (!canScroll) {
+    //         return
+    //     }
+    //     const interval = setInterval(() => {
+    //         if (scrollRef.current) {
+    //             const maxScroll = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
 
-                if (direction === 'down') {
-                    // Scroll down
-                    scrollRef.current.scrollTop += 3;
-                    if (scrollRef.current.scrollTop >= maxScroll) {
-                        setDirection('up');
-                    }
-                } else {
-                    // Scroll up
-                    scrollRef.current.scrollTop -= 3;
-                    if (scrollRef.current.scrollTop <= 0) {
-                        setDirection('down');
-                    }
-                }
-            }
-        }, 25); // Adjust interval for smoother or faster scrolling
+    //             if (direction === 'down') {
+    //                 // Scroll down
+    //                 scrollRef.current.scrollTop += 3;
+    //                 if (scrollRef.current.scrollTop >= maxScroll) {
+    //                     setDirection('up');
+    //                 }
+    //             } else {
+    //                 // Scroll up
+    //                 scrollRef.current.scrollTop -= 3;
+    //                 if (scrollRef.current.scrollTop <= 0) {
+    //                     setDirection('down');
+    //                 }
+    //             }
+    //         }
+    //     }, 25); // Adjust interval for smoother or faster scrolling
 
-        return () => clearInterval(interval); // Cleanup on unmount
-    }, [direction, canScroll]);
+    //     return () => clearInterval(interval); // Cleanup on unmount
+    // }, [direction, canScroll]);
 
     let step = 1
 
@@ -245,7 +245,7 @@ const HowToGuide = ({ videoUrl, onStepHovered, isSignedIn, handleSuccess, handle
                                 overflow: 'hidden',
                             }}
                         >
-                            <LicensePlate plateOverride={"Bad Driver"} />
+                            <LicensePlate />
                         </Box>
                     </ListItem>
                     <ListItem onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>

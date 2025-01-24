@@ -43,7 +43,6 @@ export const BasicSpeedDial = ({ avatarUrl }: SpeedProps) => {
 
   const nav = useNavigate()
 
-  console.log(avatarUrl)
   return (
     <Box sx={{
     }}>
