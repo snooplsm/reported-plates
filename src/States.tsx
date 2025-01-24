@@ -64,7 +64,7 @@ export enum State {
     },
     bottom: {
       bg: "#00000000",
-      text: (isTlc:boolean) => (isTlc ? "TL&C" : "EXCELSIOR"),
+      text: (isTlc:boolean) => (isTlc ? "T&LC" : "EXCELSIOR"),
       color: "#ED9C36",
       altColor: (isTlc:boolean) => (isTlc ? "#0B0C14" : "#ED9C36")
     },
