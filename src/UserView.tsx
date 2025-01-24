@@ -1,8 +1,9 @@
-import { GoogleLogin, useGoogleLogin } from "@react-oauth/google"
+import { GoogleLogin, useGoogleOneTapLogin } from "@react-oauth/google"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { BasicSpeedDial } from "./BasicSpeedDial"
-import { Box } from "@mui/material"
+import { Box, Button } from "@mui/material"
 import { useNavigate } from "react-router-dom"
+import { closeSnackbar, enqueueSnackbar } from "notistack"
 
 export interface UserProps {
     isSignedIn: boolean
@@ -20,9 +21,19 @@ export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handle
 
     const nav = useNavigate()
 
+    const login = () => {
+        useGoogleOneTapLogin({
+            onSuccess: handleSuccess,  
+              
+        })
+    }
+
     useImperativeHandle(ref, () => ({
         refreshUserAvatar: () => {
-            alert('You need to sign in.  Click sign in with google.')
+            enqueueSnackbar(`You need to login.`, {
+                autoHideDuration: 7000,                
+                variant: 'warning',
+              })
         },
       }));
 

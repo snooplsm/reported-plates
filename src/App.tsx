@@ -59,7 +59,7 @@ function App() {
 
   const [reportError, setReportError] = useState<Set<ReportErrors>>()
 
-  const userRef = useRef<UserViewRef|null>(null)
+  const userRef = useRef<UserViewRef | null>(null)
 
   const clearState = () => {
     setFiles(new Set())
@@ -128,7 +128,7 @@ function App() {
       setShowLoginModal([accessToken, jwt])
     })
       .then(() => {
-        
+
       }).catch(e => {
         console.log(e)
       })
@@ -145,7 +145,7 @@ function App() {
     if (!initialized) {
       initialized = true
     }
-    await downloadAll(()=> {})
+    await downloadAll(() => { })
     setLoaded(true)
   }
 
@@ -198,7 +198,7 @@ function App() {
     const user = isSignedIn
     if (user == undefined) {
       err.add(ReportErrors.NOT_LOGGED_IN)
-      if(userRef.current) {
+      if (userRef.current) {
         userRef.current.refreshUserAvatar()
       }
     }
@@ -232,7 +232,7 @@ function App() {
 
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
     setShowDragView(false)
-    if (filez && filez.length>0) {
+    if (filez && filez.length > 0) {
       const newFiles = new Set<File>(files)
       filez.forEach(file => {
         if (!fileNames.has(file.name)) {
@@ -316,10 +316,10 @@ function App() {
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {showDragView && <LargeDragDropView onFiles={onFiles}/>}
+      {showDragView && <LargeDragDropView onFiles={onFiles} />}
       <Box width="100%"><UserView ref={userRef} isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
-        
+
         display="flex"
         sx={{
           "& > *": {
@@ -327,7 +327,7 @@ function App() {
           },
         }}
         height="100vh"
-        onDragOver={(e)=> {
+        onDragOver={(e) => {
           // e.preventDefault()
           setShowDragView(true)
         }}
@@ -402,7 +402,7 @@ function App() {
               <Box sx={{
                 // marginLeft: 2
               }}>
-                <DetectionView boxes={results} onPlateChange={onPlate} onCarWithPlate={(results, plate)=> {
+                <DetectionView boxes={results} onPlateChange={onPlate} onCarWithPlate={(results, plate) => {
                   setResults(results)
                   // setBoxes(result)
                   setCar(plate)
@@ -417,30 +417,27 @@ function App() {
           <Paper sx={{
             overflow: "display",
             marginTop: 3,
-            padding: 3,
-            position: "relative"
+            position: "relative",
+            width: "100%",
           }}>
-            <CardActionArea sx={{
-              flex: 1
-            }}>
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  textAlign: "center",
-                  color: theme.palette.primary.main
-                }}
-                size='large'
-                onClick={async () => {
 
-                  const report = getReport()
+              <Button
+              onClick={async () => {
 
-                  setReportPreview(report)
-                  setShowReportPreview(true)
-                }}
-              >
-                VERIFY & SUBMIT
-              </Typography>
-            </CardActionArea>
+                const report = getReport()
+  
+                setReportPreview(report)
+                setShowReportPreview(true)
+              }}
+              variant="text"
+              sx={{
+                
+                width: "100%",
+                height: "100%",
+                padding: 2
+              }}>
+              VERIFY & SUBMIT
+              </Button>
             <StepView hasError={undefined}>{step + 2}</StepView>
           </Paper>
         </Box>
@@ -532,7 +529,7 @@ function App() {
             onCancel={() => {
               setShowReportPreview(false)
             }}
-            onComplete={(report)=> {
+            onComplete={(report) => {
               setShowReportPreview(false)
               setReportPreview(undefined)
               clearState()
@@ -541,23 +538,23 @@ function App() {
                 variant: 'success',
                 action: (key) => (
                   <>
-                      {/* <Button
+                    {/* <Button
                           size='small'
                           onClick={() => alert(`Clicked on action of snackbar with id: ${key}`)}
                       >
                           Undo
                       </Button> */}
-                      <Button size='small' onClick={() => closeSnackbar(key)}>
-                          Dismiss
-                      </Button>
+                    <Button size='small' onClick={() => closeSnackbar(key)}>
+                      Dismiss
+                    </Button>
                   </>
-              )
+                )
               })
             }}
             open={showReportPreview}
             report={reportPreview} />}
-        <SnackbarProvider/>                
-      </Box>            
+        <SnackbarProvider />
+      </Box>
     </ThemeProvider>
   )
 }

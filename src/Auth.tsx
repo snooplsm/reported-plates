@@ -152,7 +152,7 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
 }
 
 export const login = async (response: any, onAlreadyExists: (accessToken: string, decoded: CustomJwtPayload) => void): Promise<User | undefined> => {
-    const accessToken = response.credential
+    const accessToken = response.credential || response.access_token
     const current = await Parse.User.current()
     const decoded = jwtDecode(accessToken) as CustomJwtPayload;
     const userEmail = decoded.email
