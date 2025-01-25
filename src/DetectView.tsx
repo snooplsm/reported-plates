@@ -299,7 +299,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                             transform: `scale(${scale})`,
                             transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
                             width: "100%",
-                            height: "70vh",
+                            height: "auto",
                             display: "block", // Prevent inline-block issues
                             cursor: cursor,
                         }}
@@ -311,13 +311,17 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                             top: 0,
                             left: 0,
                             width: "100%",
-                            height: "70vh",
+                            height: "auto",
                             display: "block", // Ensures the canvas behaves like an inline element
                             cursor: cursor,
                             pointerEvents: "auto"
                         }}
                     />
                 </Box>
+                <Box sx={{
+                    position: "absolute",
+                    bottom: 0
+                }}>
                 <ToggleButtonGroup
                     value={selectedOption}
                     exclusive
@@ -326,6 +330,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     sx={{
                         gap: "0.5rem",
                         margin: "1rem",
+                        background: "#cccccc44"
                     }}
                 >
                     <ToggleButton value={CanvasOption.Pan} aria-label="Pan">
@@ -340,9 +345,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     <ToggleButton value={CanvasOption.ZoomOut} aria-label="ZoomOut">
                         {selectedOptionToCursor[CanvasOption.ZoomOut]}
                     </ToggleButton>
-                </ToggleButtonGroup>
-                <Box sx={{padding: 1}}>
-                <Tooltip title="Run plate detector on this image.">
+                    <Tooltip title="Run plate detector on this image.">
                     <IconButton aria-label="" onClick={()=> {
                         segment(file)
                         .then(result=> {
@@ -358,6 +361,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                         <FilterCenterFocusIcon/>
                     </IconButton>
                 </Tooltip>
+                </ToggleButtonGroup>
                 </Box>
             </Paper>
         )

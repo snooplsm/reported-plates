@@ -292,7 +292,7 @@ export const querySubmissions = async ({ startDate, endDate, reqNumber, license 
     }
 }
 export const forgotEmail = async (email: string): Promise<any> => {
-    await Parse.User.requestPasswordEmail(email)
+    await Parse.User.requestPasswordReset(email)
     return true
 }
 

@@ -44,8 +44,7 @@ const LoginModal = ({
     }
   },[payload])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     setLoading(true)
     loginWithPassword(email,password, payload![0], payload![1])
     .then(ok=> {
@@ -63,9 +62,6 @@ const LoginModal = ({
       <DialogContent>
         <CssBaseline />
         <Box
-          component="form"
-          onSubmit={handleSubmit}
-          noValidate
           sx={{ mt: 1 }}
         >
           <TextField
@@ -108,8 +104,9 @@ const LoginModal = ({
       <DialogActions>
         <LoadingButton
           loading={loading}
-          type="submit"
+          onClick={handleSubmit}
           disabled={loading}
+
           variant="contained"
           sx={{ mt: 3, mb: 2 }}
         >
