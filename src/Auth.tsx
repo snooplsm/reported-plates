@@ -6,11 +6,11 @@ import { Feature } from './api/ny/nyc/nyc';
 import { Subject } from 'rxjs';
 import { CustomJwtPayload } from './LoginModal';
 
-const PARSE_APPLICATION_ID = 'jkAZF8ojV4vOGnhSBjdwiMWBKpWML5tM4SWGKgOV';
-const PARSE_HOST_URL = 'https://parseapi.back4app.com/';
-const PARSE_JAVASCRIPT_KEY = 'LeBKOerWTXGBGRLE0yvg2bXa5RRv4e8PuC6INEFA';
-Parse.initialize(PARSE_APPLICATION_ID, PARSE_JAVASCRIPT_KEY);
-Parse.serverURL = PARSE_HOST_URL;
+const PARSE_APPLICATION_ID = import.meta.env.VITE_PARSE_APPLICATION_ID
+const PARSE_HOST_URL = import.meta.env.VITE_PARSE_HOST_URL
+const PARSE_JAVASCRIPT_KEY = import.meta.env.VITE_PARSE_JAVASCRIPT_KEY
+Parse.initialize(PARSE_APPLICATION_ID, PARSE_JAVASCRIPT_KEY)
+Parse.serverURL = PARSE_HOST_URL
 
 export const userLogout = new Subject<boolean>()
 export const userLogin = new Subject<User>()
@@ -119,7 +119,8 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     s.set('loc1_address', r.address.properties.label)
     s.set('reportDescription', r.reportDescription)
     s.set('testify', true)
-    s.set('operating_system', 'web')
+    s.set('operating_system', 'web3')
+    s.set('version_number', import.meta.env.VITE_BUID_DATE || -1)
     s.set('Phone', phone || user.phone || current.get('Phone'))
     s.set('Passenger', false)
     s.set('typeofcomplaint', r.typeofcomplaint)

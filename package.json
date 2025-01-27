@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "deploy": "gh-pages -d reported",
-    "predeploy": "vite build --base=/reported-plates/",
+    "predeploy": "BUILD_DATE=$(date +%Y%m%d) && echo $BUILD_DATE && sed -i.bak -E \"s/^BUILD_DATE=.*/BUILD_DATE=${BUILD_DATE}/\" .env && rm -f .env.bak && vite build --base=/reported-plates/",
     "lint": "eslint .",
     "preview": "vite preview"
   },

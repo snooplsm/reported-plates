@@ -30,7 +30,6 @@ import { classifyVehicle } from './classifyVehicle';
 import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
 import { LargeDragDropView } from './LargeDragDropView';
 
-
 function App() {
 
   const [files, setFiles] = useState(new Set<File>())
