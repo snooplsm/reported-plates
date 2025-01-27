@@ -249,6 +249,9 @@ function App() {
     }
 
     const exifGetter = async (file: File) => {
+      if(file.type.indexOf('image/')==-1) {
+        return
+      }
       const hash = await getFileHash(file)
       console.log("hash", hash)
       const tags = await ExifReader.load(file);
@@ -258,7 +261,6 @@ function App() {
       if (offsetTime && unprocessedTagValue) {
         const dateWithZone = `${unprocessedTagValue}${offsetTime}`.replace(/^(\d{4}):(\d{2}):/, '$1-$2-').replace(' ', 'T');
         const dateTime = new Date(dateWithZone)
-        console.log(dateTime)
         setDateOfIncident(dateTime)
       } else if (unprocessedTagValue) {
 
@@ -287,14 +289,16 @@ function App() {
     for (const file of (filez || [])) {
       if (plate?.image) {
         break
-      }
+      
+      if(file.type.indexOf('image/')==-1) {
+        return
+      }}
       segment(file)
         .then(result => {
           console.log("segmented file")
           if (result) {
             const carWithPlates = result.filter(res => res.plate != null)
             setResults(carWithPlates)
-            // setBoxes(carWithPlates)
             if (carWithPlates && carWithPlates[0]) {
               const carWithPlate = carWithPlates[0]
               if (!car) {

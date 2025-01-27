@@ -67,7 +67,7 @@ export default function MinHeightTextarea({value, onChange}:TextProps) {
     <Textarea sx={{
       width: "100%",
       
-    }} aria-label="minimum height" value={value} onChange={(event)=>onChange(event.target.value)} minRows={3} placeholder="Optional description of what you observed to send to the TL&C if applicable." />
+    }} aria-label="minimum height" value={value} onChange={(event)=>onChange(event.target.value)} minRows={3} placeholder="Optional description of what you observed to send to the T&LC if applicable." />
     </Box>
   );
 }

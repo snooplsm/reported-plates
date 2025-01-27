@@ -19,6 +19,11 @@ export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
   if(!imageSrc) {
     return null
   }
+
+  let component = 'img'
+  if(file.type.indexOf('video')!=-1) {
+    component = 'video'
+  }
   return (
     <Box
     sx={{
@@ -35,7 +40,7 @@ export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
   >
     <Box
       src={imageSrc}
-      component="img"
+      component={component}
       alt="Uploaded Preview"
       onClick={onClick}
       sx={{

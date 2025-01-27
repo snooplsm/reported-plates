@@ -106,14 +106,16 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     s.set('Username', current.get('email'))
     s.set('timeofreported', r.timeofreport)
     s.set('timeofreport', r.timeofreport)
-    s.set('LastName', user.firstName)
-    s.set('FirstName', user.lastName)
+    s.set('LastName', current.get('LastName') || user.firstName)
+    s.set('FirstName', current.get('FirstName') || user.lastName)
+    s.set('Status', 0)
     s.set('longitude1', r.address.geometry.coordinates[0])
     s.set('latitude1', r.address.geometry.coordinates[1])
     s.set('latitude', r.address.geometry.coordinates[1].toString())
     s.set('longitude', r.address.geometry.coordinates[0].toString())
-    s.set('can_be_shared', true)
+    s.set('can_be_shared_publicly', true)
     s.set('typeofreport', 'complaint')
+    s.set('colorTaxi', r.colorTaxi || undefined)
     s.set('loc1_address', r.address.properties.label)
     s.set('reportDescription', r.reportDescription)
     s.set('testify', true)
@@ -127,6 +129,7 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
         userLogin.next(toUser(current))
     }
     let index = 0
+    let videoIndex = 0
     if (r.files.length > 2) {
         throw Error("Too Many Files")
     }
@@ -134,8 +137,14 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     for (const file of r.files) {
         const f = new Parse.File(file.name, file);
         const photo = await f.save()
-        s.set(`photoData${index}`, photo)
-        index++
+        if(file.type.indexOf('image')!=-1) {
+            s.set(`photoData${index}`, photo)
+            index++
+        } else {
+            s.set(`videoData${videoIndex}`, photo)
+            videoIndex++
+        }
+        
     }
 
     (await s.save())

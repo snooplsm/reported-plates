@@ -189,7 +189,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hid
     <Box position="relative">      
       <input
         ref={inputRef}
-        accept="image/jpeg, image/heic"
+        accept="image/jpeg, image/heic, video/*"
         type="file"
         hidden
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

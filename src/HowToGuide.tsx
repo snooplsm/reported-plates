@@ -287,7 +287,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                             }}>{step += 1}</Avatar><a href="https://join.slack.com/t/reportedcab/shared_invite/zt-2xz2lt5np-9_3CzYUI0X4iGI2OLOZc0g">Join our slack!</a></Stack>}
                             secondary={
                                 <>
-                                    Our slack channel is a great resource to learn the process of filing complaints with the TL&C
+                                    Our slack channel is a great resource to learn the process of filing complaints with the T&LC
                                 </>
                             }
                         />
