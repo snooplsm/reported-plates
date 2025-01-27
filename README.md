@@ -42,5 +42,9 @@ We need your help! Join our **Slack community** to collaborate, share feedback, 
 
 ---
 
+## Visualize
+
+<img src="screenshots/reported.jpg" alt="Description" style="width:100%;"/>
+
 ## License
 This project is licensed under the MIT License. Feel free to contribute and improve the project for the community.
