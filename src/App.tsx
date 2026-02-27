@@ -6,7 +6,7 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, ThemeProvider, Paper, Typography, LinearProgress, } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, Typography, LinearProgress, useMediaQuery, } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
@@ -31,6 +31,7 @@ import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
 import { LargeDragDropView } from './LargeDragDropView';
 
 function App() {
+  const isMobile = useMediaQuery('(max-width:900px)')
 
   const [files, setFiles] = useState(new Set<File>())
   const [currentFile, setCurrentFile] = useState<number>()
@@ -355,7 +356,6 @@ function App() {
       })
     }
   }
-  let step = 1
   return (
 
     <ThemeProvider theme={theme}>
@@ -378,14 +378,17 @@ function App() {
       }} />}
       <Box width="100%"><UserView ref={userRef} isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
-
         display="flex"
+        flexDirection={{ xs: "column", md: "row" }}
         sx={{
-          "& > *": {
-            margin: 1, // Apply margin to all children
-          },
+          width: "100%",
+          maxWidth: "100vw",
+          gap: 1,
+          px: { xs: 1, md: 1 },
+          py: { xs: 2, md: 0 },
+          overflowX: "hidden",
         }}
-        height="100vh"
+        height={{ xs: "auto", md: "100vh" }}
         onDragOver={(e) => {
           // e.preventDefault()
           setShowDragView(true)
@@ -396,20 +399,23 @@ function App() {
       >
         {/* Left Column */}
         <Box
-          flex="0 0 20%"
+          flex={{ xs: "1 1 auto", md: "0 0 20%" }}
+          width={{ xs: "100%", md: "auto" }}
           display="flex"
           flexDirection="column"
           justifyContent="start"
           sx={{
+            ml: { xs: 0, md: 0.5 },
+            pt: { xs: 0, md: 2.5 },
             "& > *": {
-              marginTop: 1, // Apply margin to all children
+              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
             },
-            "& > *::first-of-type": {
-              marginTop: 0, // Apply margin to all children
+            "& > *:first-of-type": {
+              marginTop: { xs: 2, md: 0 },
             },
           }}
         >
-          <Paper sx={{ width: "100%", position: "relative", paddingTop: 3 }}>
+          <Paper sx={{ width: "100%", position: "relative", paddingTop: 3, overflow: "visible" }}>
             <ComplaintsView
               showCaption={true}
               step={Steps.DRAG_PHOTO_OR_UPLOAD}
@@ -425,7 +431,7 @@ function App() {
             />
             <StepView hasError={reportError && reportError.has(ReportErrors.NO_PHOTOS)} sx={{
               fontSize: "90%"
-            }}>{step++} & {step++}</StepView>
+            }}>1 & 2</StepView>
           </Paper>
           {files.size > 0 && <Paper>
             <Box
@@ -461,9 +467,10 @@ function App() {
               })}
             </Box>
           </Paper>}
-          <Paper sx={{
+          {!isMobile && <Paper sx={{
             width: "100%",
-            marginTop: 3
+            marginTop: 3,
+            overflow: "visible"
           }}>
             <Box sx={{
               position: "relative",
@@ -481,11 +488,11 @@ function App() {
                 }} plate={plate} />
               </Box>
               <StepView hasError={reportError && (reportError.has(ReportErrors.MISSING_PLATE) || reportError.has(ReportErrors.MISSING_PLATE_STATE))}>
-                {step++}</StepView>
+                3</StepView>
             </Box>
-          </Paper>
+          </Paper>}
 
-          <Paper sx={{
+          {!isMobile && <Paper sx={{
             overflow: "display",
             marginTop: 3,
             position: "relative",
@@ -509,19 +516,22 @@ function App() {
               }}>
               VERIFY & SUBMIT
               </Button>
-            <StepView hasError={undefined}>{step + 2}</StepView>
-          </Paper>
+            <StepView hasError={undefined}>6</StepView>
+          </Paper>}
         </Box>
         {/* Right Column */}
         <Box
-          flex="0 0 50%"
+          flex={{ xs: "1 1 auto", md: "0 0 50%" }}
+          width={{ xs: "100%", md: "auto" }}
           display="flex"
           sx={{
+            mr: { xs: 0, md: 1 },
+            pt: { xs: 0, md: 2.5 },
             "& > *": {
-              marginTop: 1, // Apply margin to all children
+              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
             },
-            "& > *::first-of-type": {
-              marginTop: 0, // Apply margin to all children
+            "& > *:first-of-type": {
+              marginTop: { xs: 2, md: 0 },
             }
           }}
         >
@@ -539,42 +549,67 @@ function App() {
           }
         </Box>
         <Box
-          flex="1"
+          flex={{ xs: "1 1 auto", md: "1" }}
+          width={{ xs: "100%", md: "auto" }}
           sx={{
+            pt: { xs: 0, md: 2.5 },
             "& > *": {
-              marginTop: 1, // Apply margin to all children
+              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
             },
-            "& > *::first-of-type": {
-              marginTop: 0, // Apply margin to all children
+            "& > *:first-of-type": {
+              marginTop: { xs: 2, md: 0 },
             }
           }
           }
         >
+          {isMobile && <Paper sx={{
+            width: "100%",
+            marginTop: 3,
+            position: "relative"
+          }}>
+            <Box sx={{
+              position: "relative",
+              padding: 2,
+              paddingTop: 3
+            }}>
+              <DetectionView boxes={results} onPlateChange={onPlate} onCarWithPlate={(results, plate) => {
+                setResults(results)
+                setCar(plate)
+                setPlate(plate.plate!)
+              }} plate={plate} />
+              <StepView hasError={reportError && (reportError.has(ReportErrors.MISSING_PLATE) || reportError.has(ReportErrors.MISSING_PLATE_STATE))}>
+                3
+              </StepView>
+            </Box>
+          </Paper>}
           <Paper sx={{
             padding: 1,
             paddingTop: 3.5,
-            position: "relative"
+            position: "relative",
+            mt: { xs: 3, md: 1 },
+            overflow: "visible"
           }}>
             <MapPickerView latLng={latLng} location={location} onLocationChange={(location) => {
               setLatLng([location?.features[0].geometry.coordinates[1], location?.features[0].geometry.coordinates[0]])
               setLocation(location)
             }} />
             <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_ADDRESS)}>
-              {step++}
+              4
             </StepView>
           </Paper>
           <Paper sx={{
             marginTop: 3,
             position: "relative",
             padding: 1,
-            paddingTop: 2
+            paddingTop: 2,
+            overflow: "visible"
 
           }}>
             <BasicDateTimePicker onChange={(value) => {
               setDateOfIncident(value)
             }} value={dateOfIncident} />
             <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_DATE)}>
-              {step++}
+              5
             </StepView>
             <TextArea
               value={reportDescription}
@@ -582,6 +617,29 @@ function App() {
             />
 
           </Paper>
+          {isMobile && <Paper sx={{
+            overflow: "display",
+            marginTop: 3,
+            marginBottom: 1,
+            position: "relative",
+            width: "100%",
+          }}>
+            <Button
+              onClick={async () => {
+                const report = getReport()
+                setReportPreview(report)
+                setShowReportPreview(true)
+              }}
+              variant="text"
+              sx={{
+                width: "100%",
+                height: "100%",
+                padding: 2
+              }}>
+              VERIFY & SUBMIT
+            </Button>
+            <StepView hasError={undefined}>6</StepView>
+          </Paper>}
         </Box>
         {showLoginModal &&
           <LoginModal

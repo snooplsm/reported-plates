@@ -72,7 +72,6 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
         fontWeight: "bold",
         color: color,
         textAlign: "center",
-        letterSpacing: "10rem",
         overflow: "hidden"
       }}
     >
@@ -93,11 +92,18 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
           InputProps={{
             disableUnderline: true, // Disable underline
             sx: {
-              fontSize: "3.2vh",
+              fontSize: { xs: "2rem", sm: "2.2rem", md: "clamp(1.9rem, 6vw, 2.5rem)" },
               fontWeight: 600,  // Remove padding
               textAlign: "center",
               width: "100%",
-              overflow: "visible"
+              overflow: "visible",
+              lineHeight: 1,
+              letterSpacing: { xs: "0.05em", sm: "0.06em", md: "0.08em" },
+              padding: 0,
+              "&::placeholder": {
+                fontSize: { xs: "1.6rem", sm: "1.8rem", md: "2rem" },
+                opacity: 0.85,
+              }
             }
 
           }}
@@ -108,6 +114,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
             fontWeight: 600,
             "& .MuiInputBase-input": {
               textAlign: "center", // Center-align input text
+              padding: 0,
             },
             "& .MuiInput-root": {
               border: "none", // No border
@@ -190,10 +197,10 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
           ref={anchorRef}
           onClick={()=>setMenuOpen(true)}
           sx={{
-            fontSize: "1.33vw",
+            fontSize: "clamp(0.6rem, 2.6vw, 1rem)",
             color: plateState.top.color,
             height: "100%",
-            paddingTop: ".1vh",
+            paddingTop: "0.1rem",
             textAlign: "center",
             whiteSpace: "nowrap", // Prevent text wrapping
             width: "100%",
@@ -251,7 +258,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
         }}
       ><Typography
         sx={{
-          fontSize: "1.3vh",
+          fontSize: "clamp(0.5rem, 2.5vw, 0.95rem)",
           zIndex: 2, // Higher than the lines
           fontWeight: 600,
           color: plateState.bottom.altColor?.(plate?.tlc || false) || bottomTextColor, // Default text color

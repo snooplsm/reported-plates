@@ -89,7 +89,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                 sx={{
                     width: '100%',
                     maxWidth: '800px',
-                    padding: 2,
+                    p: { xs: 1, sm: 2 },
                 }}
             >
                 <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
@@ -98,7 +98,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                 {/* <Typography variant="h5" >
                     Steps:
                 </Typography> */}
-                <List>
+                <List sx={{ p: { xs: 0, sm: 1 } }}>
                     {/* {!isSignedIn && <ListItem
                         onMouseOver={(e) => {
                             e.preventDefault()
@@ -138,6 +138,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                     </ListItem>
                     } */}
                     <ListItem
+                        sx={{ px: { xs: 0.5, sm: 2 } }}
                         onMouseOver={() => onStepHovered && onStepHovered(Steps.TAKE_PHOTO)}
                         onMouseLeave={() => onStepHovered && onStepHovered(undefined)}
                     >
@@ -179,6 +180,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                         </Box>
                     </ListItem>
                     <ListItem
+                        sx={{ px: { xs: 0.5, sm: 2 } }}
                         onMouseOver={(e) => {
                             e.preventDefault()
                             onStepHovered && onStepHovered(Steps.DRAG_PHOTO_OR_UPLOAD)
@@ -212,7 +214,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                             }}
                             ref={scrollRef}
                             sx={{
-                                width: "25%",
+                                width: { xs: "40%", md: "33%" },
                                 position: 'relative',
                                 borderRadius: 4,
                                 overflow: 'auto',
@@ -222,6 +224,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                         </Box>
                     </ListItem>
                     <ListItem
+                        sx={{ px: { xs: 0.5, sm: 2 } }}
                         onMouseOver={() => onStepHovered(Steps.EXTRACT_DETAILS)}
                     >
                         <ListItemText
@@ -248,7 +251,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                             <LicensePlate />
                         </Box>
                     </ListItem>
-                    <ListItem onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>
+                    <ListItem sx={{ px: { xs: 0.5, sm: 2 } }} onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>
                         <ListItemText
                             primary={
                                 <Stack direction="row" alignItems="center">
@@ -262,7 +265,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                                 </Stack>}
                             secondary={
                             <div><ol type="i" style={{
-                                marginLeft: 32
+                                marginLeft: 16
                             }}>
                                 {[
                                     <><b>Complaint Type:</b> Confirm you selected the correct complaint type</>,
@@ -277,7 +280,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                             disableTypography={true}
                         />
                     </ListItem>
-                    <ListItem>
+                    <ListItem sx={{ px: { xs: 0.5, sm: 2 } }}>
                         <ListItemText
                             primary={<Stack direction="row" alignItems="center"><Avatar sx={{
                                 bgcolor: "rgb(250,221,152)",

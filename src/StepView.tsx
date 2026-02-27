@@ -27,7 +27,7 @@ export const StepView = ({children, hasError, sx}:StepProps) => {
     return (
         <Box sx={{
             position: "absolute",
-            top: -20,
+            top: { xs: -16, md: -20 },
             left: 5,
             zIndex: 20
           }}><Avatar sx={{

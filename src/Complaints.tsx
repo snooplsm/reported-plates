@@ -207,11 +207,10 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
             top: 0,
             left: 0,
             width: '100%',
-            gap: "2%",
             padding: .5,
-            display: 'flex',
-            whiteSpace: 'nowrap',
-            flexWrap: 'wrap', // Allows items to wrap to the next row
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: 1,
           }}
         >
           {complaints.map((item, index) => {
@@ -261,10 +260,9 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 }}
                 sx={{
                   overflow: 'hidden',
-                  flex: '0 0 calc(31%)', // 50% width
-                  width: '31%',
+                  width: '100%',
+                  aspectRatio: '1/1',
                   borderRadius: 4,
-                  marginBottom: "2%",
                   filter: undefined,
                 }}
               ><ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} /></Paper>
@@ -277,13 +275,12 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
               inputRef.current?.click()
             }}
             sx={{
-              width: "31%",
+              width: "100%",
+              aspectRatio: "1/1",
               backgroundColor: "yellow",
               borderRadius: 4,
-              marginBottom: "2%",
               overflow: "hidden",
               display: "flex",
-              flex: `0 0 calc("31%"})`, // 50% width
               flexDirection: "column"
             }}
           >

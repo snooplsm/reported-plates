@@ -143,7 +143,8 @@ export const MapPickerView = ({ latLng, location, onLocationChange = () => { } }
                 position: "relative",
                 width: "100%",
                 marginTop: 1,
-                aspectRatio: "6/7"
+                aspectRatio: { xs: "6/3", md: "6/7" },
+                minHeight: { xs: 180, md: 320 }
             }}><MapContainer
                 ref={(m) => setMap(m as L.Map)}
                 style={{
