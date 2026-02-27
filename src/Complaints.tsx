@@ -86,16 +86,16 @@ const handleDrop = (onFiles: (complaint: Complaint, files: File[]) => void, comp
 };
 
 export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex }: ComplaintProps) => {
+  const isActive = index === hoveredIndex
 
   const media = () => {
     const media = complaint.media
-    const even = index % 2 == 0
     if (media == MediaType.Image) {
       return (
         <Box component="img" key={complaint.type} src={complaint.src} sx={{
           width: "100%", height: "100%", objectFit: "cover", objectPosition: "center",
-
-          transition: "transform   0.1s ease", // Smooth hover effect
+          transform: isActive ? "scale(1.2)" : "scale(1)",
+          transition: "transform 0.1s ease", // Smooth hover effect
           "&:hover": {
             transform: "scale(1.2)", // Scale image on hover        
             cursor: "pointer"
@@ -104,7 +104,7 @@ export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex
       )
     } else if (media == MediaType.Lottie) {
       return (
-        <LottiePlayer forcePlay={index == hoveredIndex} complaint={complaint} notHovered={notHovered} index={index} size={size} />
+        <LottiePlayer forcePlay={isActive} complaint={complaint} notHovered={notHovered} index={index} size={size} />
       )
     }
   }
@@ -227,10 +227,10 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 key={item.type + "_" + index}
                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                   e.preventDefault()
-                  console.log("drag over")
+                  setHoveredIndex(index)
                 }}
                 onDragEnd={()=> {
-                  console.log("drag end")
+                  setHoveredIndex(undefined)
                 }}
                 onDragEnter={(e: DragEvent) => {
                   // console.log("drag enter")
@@ -251,11 +251,12 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 }}
                 onMouseLeave={(e) => {
                   // console.log("mouse leave")
-                  setHoveredIndex(undefined)
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setHoveredIndex(undefined)
+                  }
                   e.preventDefault()
                 }}
                 onDragLeave={(e) => {
-                  setHoveredIndex(undefined)
                   e.preventDefault()
                 }}
                 sx={{
@@ -328,49 +329,31 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
 }
 
 export const LottiePlayer = ({ complaint, width, forcePlay }: ComplaintProps) => {
-
-  const [ready, setReady] = useState(false)
-  const [autoPlay, setAutoPlay] = useState(false)
-  const [goTo, setGoTo] = useState<number>()
-
-  const [options, setOptions] = useState<any>()
-
-  const playPause = (play: boolean) => {
-    if (play) {
-      setAutoPlay(true)
-      setGoTo(undefined)
-    } else if (!play) {
-      setGoTo(complaint.lottieFrame)
-      setAutoPlay(false)
-    }
-  }
-
-  useEffect(() => {
-    setGoTo(complaint.lottieFrame)
-  }, [])
-
+  const goTo = forcePlay ? undefined : (complaint.lottieFrame || 0)
   return (<Box
     key={complaint.type}
-    onMouseOver={(e) => {
-      playPause(true)
-      e.preventDefault()
-    }}
-    onMouseLeave={(e) => {
-      playPause(false)
-      e.preventDefault()
-    }
-
-    }
     sx={{
       flex: `0 0 calc(${width || "31%"})`, // 50% width
-      width: width, overflow: "hidden",
+      width: width,
+      height: "100%",
+      overflow: "hidden",
+      position: "relative",
+      borderRadius: "inherit",
       objectFit: "cover", objectPosition: "center",
       cursor: "pointer"
       // filter: "grayscale(100%)"
     }}>
     <Lottie
-      goTo={complaint.lottieFrame || 0}
-      play={forcePlay || autoPlay}
+      rendererSettings={{
+        preserveAspectRatio: "xMidYMid slice",
+      }}
+      style={{
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+      }}
+      goTo={goTo}
+      play={!!forcePlay}
       loop={true}      
       speed={complaint.lottieSpeed || 1}
       animationData={complaint.src}
