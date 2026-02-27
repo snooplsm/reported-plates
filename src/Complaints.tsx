@@ -118,6 +118,7 @@ export const ComplaintView = ({ complaint, index, size, notHovered, hoveredIndex
 
 interface ComplaintsProps {
   onFiles: (complaint: Complaint | undefined, file: File[]) => void,
+  onPrepareUpload?: () => void,
   step?: Steps,
   hoveredStep?: Steps | undefined
   showCaption?: boolean,
@@ -126,7 +127,7 @@ interface ComplaintsProps {
   hideUpload?:boolean
 }
 
-export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hideUpload=false, hoveredStep, showCaption }: ComplaintsProps) => {
+export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplaint, onChange, hideUpload=false, hoveredStep, showCaption }: ComplaintsProps) => {
 
   const inputRef = useRef<HTMLInputElement>()
 
@@ -189,7 +190,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hid
     <Box position="relative">      
       <input
         ref={inputRef}
-        accept="image/jpeg, image/heic, video/*"
+        accept="image/jpeg, image/heic, image/webp, video/*"
         type="file"
         hidden
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,6 +235,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hid
                 onDragEnter={(e: DragEvent) => {
                   // console.log("drag enter")
                   setHoveredIndex(index)
+                  onPrepareUpload?.()
                   e.preventDefault()
                 }}
                 onDrop={(e: React.DragEvent<HTMLDivElement>) => {
@@ -244,6 +246,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hid
                 }}
                 onClick={() => {
                   handleSelect(index)
+                  onPrepareUpload?.()
                   inputRef.current.click()                  
                 }}
                 onMouseLeave={(e) => {
@@ -269,6 +272,7 @@ export const ComplaintsView = ({ onFiles, step, selectedComplaint, onChange, hid
           {hideUpload!=true && <Paper
             elevation={3}
             onClick={()=> {
+              onPrepareUpload?.()
               inputRef.current?.click()
             }}
             sx={{

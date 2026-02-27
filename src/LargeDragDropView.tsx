@@ -4,9 +4,10 @@ import { useEffect } from "react";
 
 interface LargeDragProps {
     onFiles: (complaint:Complaint | undefined, files: File[]) => void
+    onPrepareUpload?: () => void
 }
 
-export const LargeDragDropView = ({onFiles}:LargeDragProps) => {
+export const LargeDragDropView = ({onFiles, onPrepareUpload}:LargeDragProps) => {
 
       const handleDragEnd = () => {
         onFiles(undefined,[])
@@ -39,7 +40,7 @@ export const LargeDragDropView = ({onFiles}:LargeDragProps) => {
             width: "80%",
             display: "flex",
         }}>
-        <ComplaintsView showCaption={true} hideUpload={true} onFiles={onFiles} onChange={()=>{}}/>
+        <ComplaintsView showCaption={true} hideUpload={true} onPrepareUpload={onPrepareUpload} onFiles={onFiles} onChange={()=>{}}/>
         </Box>
     </Box>
 }

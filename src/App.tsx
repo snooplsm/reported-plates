@@ -6,7 +6,7 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, ThemeProvider, Paper, Typography, CardActionArea, } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, Typography, LinearProgress, } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
@@ -50,7 +50,12 @@ function App() {
 
   const [dateOfIncident, setDateOfIncident] = useState<Date>()
 
-  const [, setLoaded] = useState(false)
+  const [modelsReady, setModelsReady] = useState(false)
+  const [isModelLoading, setIsModelLoading] = useState(false)
+  const [modelLoadState, setModelLoadState] = useState({
+    text: "Preparing AI models...",
+    progress: 0
+  })
 
   const [reportPreview, setReportPreview] = useState<Report>()
 
@@ -138,14 +143,49 @@ function App() {
     console.log('Google login failed');
   };
 
-  let initialized = false
+  const runtimeReadyRef = useRef(typeof cv.Mat === "function")
+  const runtimeReadyPromiseRef = useRef<Promise<void> | null>(null)
+  const modelWarmupPromiseRef = useRef<Promise<void> | null>(null)
 
-  cv["onRuntimeInitialized"] = async () => {
-    if (!initialized) {
-      initialized = true
+  const ensureRuntimeReady = () => {
+    if (runtimeReadyRef.current || typeof cv.Mat === "function") {
+      runtimeReadyRef.current = true
+      return Promise.resolve()
     }
-    await downloadAll(() => { })
-    setLoaded(true)
+    if (runtimeReadyPromiseRef.current) {
+      return runtimeReadyPromiseRef.current
+    }
+    runtimeReadyPromiseRef.current = new Promise<void>((resolve) => {
+      cv["onRuntimeInitialized"] = () => {
+        runtimeReadyRef.current = true
+        resolve()
+      }
+    })
+    return runtimeReadyPromiseRef.current
+  }
+
+  const startModelWarmup = () => {
+    if (modelsReady) {
+      return Promise.resolve()
+    }
+    if (modelWarmupPromiseRef.current) {
+      return modelWarmupPromiseRef.current
+    }
+    setIsModelLoading(true)
+    setModelLoadState({
+      text: "Preparing AI runtime...",
+      progress: 5
+    })
+    modelWarmupPromiseRef.current = (async () => {
+      await ensureRuntimeReady()
+      await downloadAll((progress) => {
+        setModelLoadState(progress)
+      })
+      setModelsReady(true)
+    })().finally(() => {
+      setIsModelLoading(false)
+    })
+    return modelWarmupPromiseRef.current
   }
 
   const getReport = () => {
@@ -232,6 +272,7 @@ function App() {
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
     setShowDragView(false)
     if (filez && filez.length > 0) {
+      void startModelWarmup()
       const newFiles = new Set<File>(files)
       filez.forEach(file => {
         if (!fileNames.has(file.name)) {
@@ -319,7 +360,22 @@ function App() {
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {showDragView && <LargeDragDropView onFiles={onFiles} />}
+      {isModelLoading && !modelsReady && <Paper sx={{
+        position: "fixed",
+        zIndex: 1400,
+        top: 0,
+        left: 0,
+        width: "100%",
+        borderRadius: 0,
+        paddingX: 2,
+        paddingY: 1
+      }}>
+        <Typography sx={{ fontSize: ".85rem", marginBottom: .5 }}>{modelLoadState.text}</Typography>
+        <LinearProgress variant="determinate" value={modelLoadState.progress} />
+      </Paper>}
+      {showDragView && <LargeDragDropView onFiles={onFiles} onPrepareUpload={() => {
+        void startModelWarmup()
+      }} />}
       <Box width="100%"><UserView ref={userRef} isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
 
@@ -333,6 +389,9 @@ function App() {
         onDragOver={(e) => {
           // e.preventDefault()
           setShowDragView(true)
+        }}
+        onDragEnter={() => {
+          void startModelWarmup()
         }}
       >
         {/* Left Column */}
@@ -351,10 +410,19 @@ function App() {
           }}
         >
           <Paper sx={{ width: "100%", position: "relative", paddingTop: 3 }}>
-            <ComplaintsView showCaption={true} step={Steps.DRAG_PHOTO_OR_UPLOAD} hoveredStep={hoveredStep} onFiles={onFiles} selectedComplaint={complaint} onChange={(complaint) => {
-              setComplaint(complaint)
-            }
-            } />
+            <ComplaintsView
+              showCaption={true}
+              step={Steps.DRAG_PHOTO_OR_UPLOAD}
+              hoveredStep={hoveredStep}
+              onFiles={onFiles}
+              selectedComplaint={complaint}
+              onChange={(complaint) => {
+                setComplaint(complaint)
+              }}
+              onPrepareUpload={() => {
+                void startModelWarmup()
+              }}
+            />
             <StepView hasError={reportError && reportError.has(ReportErrors.NO_PHOTOS)} sx={{
               fontSize: "90%"
             }}>{step++} & {step++}</StepView>

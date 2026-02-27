@@ -1,5 +1,7 @@
-import { Avatar, Box } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { Avatar, Box, LinearProgress, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import heic2any from "heic2any";
+
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 
 interface FileProps {
@@ -10,14 +12,81 @@ interface FileProps {
 
 export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [previewProgress, setPreviewProgress] = useState(0);
+  const [previewText, setPreviewText] = useState("Processing...");
+  const prevFileRef = useRef<File>();
+  const previewUrlRef = useRef<string | null>(null);
 
-  useEffect(()=> {
-    const blobUrl = URL.createObjectURL(file);
-    setImageSrc(blobUrl);
-  },[file])
+  useEffect(() => {
+    if (prevFileRef.current !== file) {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+      setImageSrc(null);
+      setPreviewText("Processing preview...");
+      setPreviewProgress(10);
+
+      const processFile = async () => {
+        try {
+          let blob: Blob;
+          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+            setPreviewText("Converting HEIC...");
+            setPreviewProgress(45);
+            blob = await heic2any({
+              blob: file,
+              toType: "image/jpeg",
+              quality: 1,
+            }) as Blob;
+            setPreviewProgress(80);
+          } else {
+            blob = file;
+            setPreviewProgress(70);
+          }
+
+          setPreviewText("Rendering preview...");
+          const blobUrl = URL.createObjectURL(blob);
+          previewUrlRef.current = blobUrl;
+          setImageSrc(blobUrl);
+          setPreviewProgress(100);
+          prevFileRef.current = file;
+        } catch (err) {
+          console.error("Failed to process file", err);
+          setPreviewText("Preview failed");
+        }
+      };
+      processFile();
+    }
+
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, [file]);
+
 
   if(!imageSrc) {
-    return null
+    return (
+      <Box
+        sx={{
+          width: '33%',
+          aspectRatio: '1/1',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          marginRight: '.3rem',
+          borderRadius: '10px',
+          border: '1px solid #ccc',
+          padding: 1
+        }}
+      >
+        <Typography sx={{ fontSize: '.7rem', marginBottom: .5 }}>{previewText}</Typography>
+        <LinearProgress variant="determinate" value={previewProgress} sx={{ width: "100%" }} />
+      </Box>
+    )
   }
 
   let component = 'img'

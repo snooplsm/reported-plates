@@ -3,7 +3,7 @@
 ## About
 This web app focuses on bridging the gap between NYC 311 and NY TLC. It simplifies the process of reporting reckless driving or other infractions by requiring only a photo of the incident. If safely possible, include the license plate in the photo.
 
-Demo can be found [here](https://snooplsm.github.io/reported-plates)
+Demo can be found [here](https://new.rprtd.app)
 
 The app automatically extracts:
 - **License Plate** information

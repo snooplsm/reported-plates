@@ -1,13 +1,14 @@
 {
   "name": "reported-plate",
-  "home": "https://snooplsm.github.io/reported-plate",
+  "home": "https://new.rprtd.app",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "deploy": "gh-pages -d reported",
-    "predeploy": "BUILD_DATE=$(date +%Y%m%d) && echo $BUILD_DATE && sed -i.bak -E \"s/^BUILD_DATE=.*/BUILD_DATE=${BUILD_DATE}/\" .env && rm -f .env.bak && vite build --base=/reported-plates/",
+    "predeploy": "BUILD_DATE=$(date +%Y%m%d) && echo $BUILD_DATE && sed -i.bak -E \"s/^BUILD_DATE=.*/BUILD_DATE=${BUILD_DATE}/\" .env && rm -f .env.bak && vite build --base=/",
+    "release": "npm run build && aws s3 sync ./reported s3://reported.plate",
     "lint": "eslint .",
     "preview": "vite preview"
   },

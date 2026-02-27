@@ -26,27 +26,55 @@ let plate: InferenceSession
 let ocr: InferenceSession
 let plateClass: InferenceSession
 
+interface DownloadProgressState {
+    text: string
+    progress: number
+}
+
 const topk = 100;
 const iouThreshold = 0.4;
 const scoreThreshold = 0.2;
 
-export const downloadAll = async (setLoading: unknown) => {
+export const downloadAll = async (onProgress?: (progress: DownloadProgressState) => void) => {
     if (downloaded) {
+        onProgress?.({
+            text: "Models ready",
+            progress: 100
+        })
         return
     }
     if (downloading) {
         return downloading
     }
+    const progressByModel = new Map<string, number>()
+    const updateProgress = () => {
+        const total = models.length
+        const sum = Array.from(progressByModel.values()).reduce((acc, value) => acc + value, 0)
+        const progress = total > 0 ? sum / total : 0
+        onProgress?.({
+            text: "Downloading models...",
+            progress: Math.min(95, parseFloat(progress.toFixed(2)))
+        })
+    }
+
     const promises: Promise<ArrayBuffer>[] = [];
     models.forEach(([type, modelName]) => {
+        progressByModel.set(type, 0)
         const url = `${import.meta.env.BASE_URL}models/${modelName}.onnx`
         promises.push(download(
             url,
             [type,
-                () => setLoading]
+                ({ progress }) => {
+                    progressByModel.set(type, progress)
+                    updateProgress()
+                }]
         ))
     })
-    downloading = Promise.all(promises).then(async result => {        
+    downloading = Promise.all(promises).then(async result => {
+        onProgress?.({
+            text: "Initializing models...",
+            progress: 97
+        })
         yolo = await InferenceSession.create(result[0]);
         nms = await InferenceSession.create(result[1]);
         plate = await InferenceSession.create(result[3]);
@@ -54,6 +82,10 @@ export const downloadAll = async (setLoading: unknown) => {
         ocr = await InferenceSession.create(result[5]);
         downloaded = true
         downloading = null
+        onProgress?.({
+            text: "Models ready",
+            progress: 100
+        })
     }).catch(console.log)
     return downloading
 }
