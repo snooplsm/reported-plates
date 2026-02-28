@@ -5,12 +5,14 @@ import heic2any from "heic2any";
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 
 interface FileProps {
+  id: string,
   file: File,
   onClick: ()=>void
   onClickDelete: ()=>void
+  onProcessingChange?: (id: string, status?: { text: string; progress: number }) => void
 }
 
-export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
+export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessingChange}:FileProps) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewText, setPreviewText] = useState("Processing...");
@@ -33,26 +35,36 @@ export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
           if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
             setPreviewText("Converting HEIC...");
             setPreviewProgress(45);
+            onProcessingChange?.(id, { text: "Converting HEIC...", progress: 45 });
             blob = await heic2any({
               blob: file,
               toType: "image/jpeg",
               quality: 1,
             }) as Blob;
             setPreviewProgress(80);
+            onProcessingChange?.(id, { text: "Converting HEIC...", progress: 80 });
           } else {
             blob = file;
             setPreviewProgress(70);
           }
 
           setPreviewText("Rendering preview...");
+          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+            onProcessingChange?.(id, { text: "Rendering HEIC preview...", progress: 92 });
+          }
           const blobUrl = URL.createObjectURL(blob);
           previewUrlRef.current = blobUrl;
           setImageSrc(blobUrl);
           setPreviewProgress(100);
+          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+            onProcessingChange?.(id, { text: "HEIC ready", progress: 100 });
+            onProcessingChange?.(id, undefined);
+          }
           prevFileRef.current = file;
         } catch (err) {
           console.error("Failed to process file", err);
           setPreviewText("Preview failed");
+          onProcessingChange?.(id, undefined);
         }
       };
       processFile();
@@ -63,8 +75,9 @@ export const FileUploadPreview = ({file, onClick, onClickDelete}:FileProps) => {
         URL.revokeObjectURL(previewUrlRef.current);
         previewUrlRef.current = null;
       }
+      onProcessingChange?.(id, undefined);
     };
-  }, [file]);
+  }, [file, id, onProcessingChange]);
 
 
   if(!imageSrc) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import cv from "@techstark/opencv-js";
 import * as ExifReader from 'exifreader';
@@ -6,7 +6,7 @@ import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, ThemeProvider, Paper, Typography, LinearProgress, useMediaQuery, } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, LinearProgress, useMediaQuery, } from "@mui/material";
 import theme from './theme';
 import DetectView from './DetectView';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
@@ -57,6 +57,7 @@ function App() {
     text: "Preparing AI models...",
     progress: 0
   })
+  const [heicProcessing, setHeicProcessing] = useState<Record<string, { text: string; progress: number }>>({})
 
   const [reportPreview, setReportPreview] = useState<Report>()
 
@@ -76,6 +77,7 @@ function App() {
     setLatLng(undefined)
     setComplaint(undefined)
     setLocation(undefined)
+    setHeicProcessing({})
   }
 
   useEffect(() => {
@@ -118,6 +120,17 @@ function App() {
   const [reportDescription, setReportDescription] = useState<string>('')
 
   const [showDragView, setShowDragView] = useState(false)
+  const onHeicProcessingChange = useCallback((id: string, status?: { text: string; progress: number }) => {
+    setHeicProcessing((prev) => {
+      const next = { ...prev }
+      if (status) {
+        next[id] = status
+      } else {
+        delete next[id]
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     const signedIn = async () => {
@@ -356,22 +369,29 @@ function App() {
       })
     }
   }
+  const heicStates = Object.values(heicProcessing)
+  const isHeicProcessing = heicStates.length > 0
+  const heicProgress = isHeicProcessing
+    ? heicStates.reduce((acc, state) => acc + state.progress, 0) / heicStates.length
+    : 0
+  const topBarValue = isModelLoading ? modelLoadState.progress : heicProgress
+
   return (
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {isModelLoading && !modelsReady && <Paper sx={{
+      {(isModelLoading || isHeicProcessing) && <Paper sx={{
         position: "fixed",
         zIndex: 1400,
         top: 0,
         left: 0,
         width: "100%",
         borderRadius: 0,
-        paddingX: 2,
-        paddingY: 1
+        padding: 0,
+        background: "transparent",
+        boxShadow: "none"
       }}>
-        <Typography sx={{ fontSize: ".85rem", marginBottom: .5 }}>{modelLoadState.text}</Typography>
-        <LinearProgress variant="determinate" value={modelLoadState.progress} />
+        <LinearProgress variant="determinate" value={topBarValue} sx={{ height: 3 }} />
       </Paper>}
       {showDragView && <LargeDragDropView onFiles={onFiles} onPrepareUpload={() => {
         void startModelWarmup()
@@ -444,9 +464,11 @@ function App() {
                 width: "100%", overflow: "display",
               }}>
               {[...(files || [])].map((x, index) => {
-                return <FileUploadPreview onClick={() => {
+                const id = `${x.name}_${x.lastModified}_${x.size}`
+                return <FileUploadPreview id={id} onProcessingChange={onHeicProcessingChange} onClick={() => {
                   setCurrentFile(index)
                 }} file={x} onClickDelete={() => {
+                  onHeicProcessingChange(id, undefined)
                   setFiles((files) => {
                     let fileIndex = undefined
                     if (currentFile) {
