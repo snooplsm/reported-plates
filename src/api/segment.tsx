@@ -120,6 +120,32 @@ const divStride = (stride: number, width: number, height: number) => {
     return [width, height];
 };
 
+const clampRectToMat = (mat: Mat, x1: number, y1: number, x2: number, y2: number): cv.Rect | null => {
+    const left = Math.max(0, Math.floor(Math.min(x1, x2)));
+    const top = Math.max(0, Math.floor(Math.min(y1, y2)));
+    const right = Math.min(mat.cols, Math.ceil(Math.max(x1, x2)));
+    const bottom = Math.min(mat.rows, Math.ceil(Math.max(y1, y2)));
+    const width = right - left;
+    const height = bottom - top;
+    if (width <= 2 || height <= 2) {
+        return null;
+    }
+    return new cv.Rect(left, top, width, height);
+}
+
+const detectPlateBoxes = async (mat: Mat): Promise<DetectionResult[]> => {
+    const letter = letterbox(mat, [640, 640]);
+    const tensor = await matToOnnxTensor(letter.image);
+    const { output0: predictions } = await plate.run({ images: tensor });
+    return convertToDetectionResult(
+        predictions.data as Float32Array,
+        ['plate', 'fuhghedaboutit'],
+        letter.scale,
+        letter.pad,
+        0.2
+    ).sort((a, b) => b.confidence - a.confidence);
+}
+
 
 
 export const segment = async (file: File): Promise<DetectBox[]> => {
@@ -297,248 +323,72 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                 canvas.remove()
                 box.car = blob
                 const url = URL.createObjectURL(blob);
-
-                // Create a hidden <a> element to trigger the download
                 const link = document.createElement("a");
                 link.href = url;
                 link.download = "car.jpg";
-                // link.click()
                 URL.revokeObjectURL(url)
-                const letter = letterbox(roi, [640,640])
-                roi.delete()
-                // await downloadMatAsImage(letter.image)
-                const tensor = await matToOnnxTensor(letter.image)
-                // matC3.delete()
-                // matPad.delete()
-                // const tensor = new Tensor("float32", input, modelInputShape);
-                const { output0: predictions } = await plate.run({
-                    images: tensor
-                })
-                const padding = letter.pad
-                const ratio = letter.scale
-                const result = convertToDetectionResult(predictions.data as Float32Array, ['plate','fuhghedaboutit'], ratio, padding)
-                for(const k of result) {
-                    if(k.confidence> .2) {
-                        box.plate = {
-                            box: [k.boundingBox.x1,k.boundingBox.y1,k.boundingBox.x2,k.boundingBox.y2],
-                            probability: k.confidence                        
-                        }
-                        let [cropX, cropY, cropWidth, cropHeight] = [
-                            k.boundingBox.x1, k.boundingBox.y1, k.boundingBox.x2-k.boundingBox.x1, k.boundingBox.y2-k.boundingBox.y1
-                        ]
-                    
-                        const rect = new cv.Rect(cropX, cropY, cropWidth, cropHeight)
-                        let roi: cv.Mat;
-                        const roid = await blobToMat(box.car as Blob);
-                        try {                            
-                            roi = roid.roi(rect).clone();
-                            roid.delete()
-                        } catch (e) {
-                            console.log(e);
-                            roi = roid; // Fallback to the original `roid` if the `roi` operation fails
 
-                        }
-                        let canvas = document.createElement('canvas') as HTMLCanvasElement;
-                        let ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-                        let imgData = new ImageData(
-                            new Uint8ClampedArray(roi.data),
-                            roi.cols,
-                            roi.rows
-                        );                        
-                        canvas.width = imgData.width;
-                        canvas.height = imgData.height;
-                        ctx.putImageData(imgData, 0, 0);
-                        const blob = await canvasToBlob(canvas)
-                        box.plate.image = blob
-                        canvas.remove()
-                        box.plate.image = blob
-                        const url = URL.createObjectURL(blob);
+                const initialDetections = await detectPlateBoxes(roi)
+                const initialBest = initialDetections.find((det) => det.confidence > 0.2)
+                if (!initialBest) {
+                    roi.delete()
+                    continue
+                }
 
-                        // Create a hidden <a> element to trigger the download
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = "plate.jpg";
-                        // Trigger the download
-                        // link.click();
+                let sourceForDetection = roi
+                let chosenDetection = initialBest
+                let rotatedCar: Mat | null = null
 
-                        // Clean up the temporary URL
-                        URL.revokeObjectURL(url);        
-                        
-                        const blur = new cv.Mat()
-                        cv.medianBlur(roi, blur, 3)
-                        const edges = new cv.Mat()
-                        cv.Canny(blur, edges, 30, 100, 3, true)
-                        const lines = new cv.Mat()
-                        const rho = 1; // Distance resolution in pixels
-                        const theta = Math.PI / 180; // Angle resolution in radians
-                        const threshold = 30; // Accumulator threshold
-                        const minLineLength = roi.rows / 4.0; // Minimum line length
-                        const maxLineGap = roi.cols / 4.0; // Maximum gap between lines
-                        try {
-                            cv.HoughLines(edges, lines, rho, theta, threshold, minLineLength, maxLineGap);
-                        } catch (e) {
-                            console.log(e)
-                        }
-                        let angle = 0.0
-                        let nlines = lines.size
-                        let cnt = 0
-                        if (lines instanceof cv.Mat && lines.rows > 0) {
-                            for (let i = 0; i < lines.rows; i++) {
-                                const x1 = lines.data32S[i * 4];
-                                const y1 = lines.data32S[i * 4 + 1];
-                                const x2 = lines.data32S[i * 4 + 2];
-                                const y2 = lines.data32S[i * 4 + 3];
-                        
-                                // Calculate the angle
-                                const ang = Math.atan2(y2 - y1, x2 - x1);
-                        
-                                // Exclude extreme rotations (30 degrees threshold converted to radians)
-                                if (Math.abs(ang) <= 40 * (Math.PI / 180)) {
-                                    angle += ang;
-                                    cnt += 1;
-                                }
-                            }
-                        }
-                        lines.delete()
-                        edges.delete()
-                        if(cnt==0) {
-                            angle = 0.0
-                        }
-                        if(angle!=0.0) {
-                            // const center = new cv.Point(roi.rows/2,roi.cols/2)
-                            // const rotate = cv.getRotationMatrix2D(center, -angle, 1.0)
-                            // cv.warpAffine(roi, roi, rotate, new cv.Size(roi.cols,roi.rows), cv.INTER_LINEAR)
-                        }
-                                    
+                const firstRect = clampRectToMat(
+                    roi,
+                    initialBest.boundingBox.x1,
+                    initialBest.boundingBox.y1,
+                    initialBest.boundingBox.x2,
+                    initialBest.boundingBox.y2
+                )
 
-                        const src = await blobToMat(blob)
-                        const matC3 = new cv.Mat(); // new image matrix
-                        cv.cvtColor(src, matC3, cv.COLOR_BGR2GRAY); // RGBA to BGR
-                        const [w3, h3] = divStride(32, matC3.cols, matC3.rows);
-                        cv.resize(matC3, matC3, new cv.Size(w3, h3))                    
-                        
-                        const matPad = matC3.clone()
-                        
-                        cv.resize(matPad, matPad, new cv.Size(140, 70))
+                if (firstRect) {
+                    const roughPlate = roi.roi(firstRect).clone()
+                    const angle = estimateSkewAngleDeg(roughPlate)
+                    roughPlate.delete()
 
-                        const input = new Uint8Array(matPad.data);
-                        roi.delete()
-                        matC3.delete();
-                        matPad.delete();
-                        const slots = 8
-                        const tensorShape = [slots, 70, 140, 1];
-                        const tensorData = new Uint8Array(slots * 70 * 140 * 1);
-
-                        // Fill the tensorData with the image data (supports batch if needed)
-                        for (let i = 0; i < input.length; i++) {
-                            tensorData[i] = input[i];
-                        }
-                        const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
-                        // Create the tensor
-                        const tensor = new Tensor("uint8", tensorData, tensorShape);
-                        const { concatenate } = await ocr.run({ input: tensor })
-                        // const totalElements = concatenate.data.length;
-                        const alphabetLength = alphabet.length;
-                        const batchSize = slots * alphabetLength;
-                        const reshaped = concatenate
-                        const data = reshaped.data; // Access the raw data as a Float32Array
-                        const platesWithProbabilities = [];
-
-                        for (let b = 0; b < batchSize; b++) {
-                            const batchStart = b * slots * alphabetLength;
-                            const batchIndices: number[] = [];
-                            const slotProbabilities: number[] = [];
-
-                            for (let s = 0; s < slots; s++) {
-                                const slotStart = batchStart + s * alphabetLength;
-                                // Ensure slotData is typed as number[]
-                                const slotData: number[] = Array.from(data.slice(slotStart, slotStart + alphabetLength) as Float32Array);
-
-                                // Use reduce to find the index of the maximum value
-                                const maxIndex = slotData.reduce((maxIdx: number, value: number, idx: number) =>
-                                    value > slotData[maxIdx] ? idx : maxIdx, 0
-                                );
-
-                                // Get the probability of the max index
-                                const maxValue = Math.max(...slotData);
-
-                                batchIndices.push(maxIndex); // Store the character index
-                                slotProbabilities.push(maxValue); // Store the slot's probability
-                            }
-
-                            // Step 3: Convert indices to characters
-                            const plateChars = batchIndices.map(index => alphabet[index]);
-                            const plate = plateChars.join("");
-
-                            // Calculate overall plate probability (average)
-                            const averageProbability = slotProbabilities.reduce((a, b) => a + b, 0) / slotProbabilities.length;
-
-                            // Add to platesWithProbabilities array
-                            platesWithProbabilities.push({
-                                plate, // Plate string
-                                probabilities: slotProbabilities, // Individual slot probabilities
-                                averageProbability, // Average probability of the plate
-                            });
-                        }
-                        const matC4 = await blobToMat(blob)
-                        cv.resize(matC4, matC4, new cv.Size(160, 160), 0, 0, cv.INTER_LINEAR);
-                        matC4.convertTo(matC4, cv.CV_32F, 1 / 255.0); // Normalize to [0, 1]       
-                        cv.cvtColor(matC4, matC4, cv.COLOR_RGBA2RGB);
-
-                        const plateClassTensor = new Tensor("float32", matC4.data32F, [1, 3, 160, 160]);
-                        const res = await plateClass.run({ images: plateClassTensor });
-                        const outputTensor = res["output0"]
-                        const data2 = outputTensor.data as Float32Array; // Access the raw data
-                        const batchSize2 = outputTensor.dims[0]; // Should be 1 for this case
-                        // const outputLength = outputTensor.dims[1]; // Should be 7 for this case
-
-                        if (batchSize2 !== 1) {
-                            throw new Error("Batch size other than 1 is not supported");
-                        }
-
-                        // Assuming data is [x_center, y_center, width, height, class_prob_1, class_prob_2, ...]
-                        const xCenter = data2[0];
-                        const yCenter = data2[1];
-                        const width = data2[2];
-                        const height = data2[3];
-
-                        // Class probabilities start from index 4
-                        const classProbabilities = data2.slice(4);
-
-                        // Get the most likely class index and probability
-                        const maxProbIndex = classProbabilities.reduce(
-                            (maxIdx, value, idx, array) => (value > array[maxIdx] ? idx : maxIdx),
-                            0
-                        );
-                        const label = maxProbIndex + 4
-                        const maxProbability = classProbabilities[maxProbIndex];
-                        const plateProb = platesWithProbabilities[0] || null
-                        
-                        if(box.plate) {
-                            const plate = box.plate
-                            plate.text = plateProb.plate.split("").filter(x=>x!=='_').join("")
-                            plate.textWithUnderscores = plateProb.plate
-                            plate.textAvgProb = plateProb.averageProbability
-                            plate.textLetterProb = plateProb.probabilities
-                            plate.state = yoloClassIndexToLabel[label].split("_")[0] as State
-                            plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
-                            plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
-                            plate.stateConfidence = maxProbability
-
-                            if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
-                                plate.text = plate.text.replace(/I/g, '1');
-                                plate.text = plate.text.replace(/L/g, '1');
-                                plate.text = plate.text.replace(/Z/g, '2');
-                                plate.text = plate.text.replace(/G/g, '6');
-                                plate.text = plate.text.replace(/B/g, '8');
-                                plate.text = plate.text.replace(/A/g, '4');
-                                plate.text = plate.text.replace(/O/g, '0');
-                                plate.state = State.NY
-                                plate.tlc = true
-                            }
+                    if (Math.abs(angle) >= 1) {
+                        // estimateSkewAngleDeg returns the observed tilt; rotate full car in the
+                        // same corrective direction used by deskewPlateMat for consistency.
+                        rotatedCar = rotateMatExpand(roi, angle)
+                        const rotatedDetections = await detectPlateBoxes(rotatedCar)
+                        const rotatedBest = rotatedDetections.find((det) => det.confidence > 0.2)
+                        if (rotatedBest) {
+                            sourceForDetection = rotatedCar
+                            chosenDetection = rotatedBest
+                        } else {
+                            rotatedCar.delete()
+                            rotatedCar = null
                         }
                     }
                 }
+
+                const finalRect = clampRectToMat(
+                    sourceForDetection,
+                    chosenDetection.boundingBox.x1,
+                    chosenDetection.boundingBox.y1,
+                    chosenDetection.boundingBox.x2,
+                    chosenDetection.boundingBox.y2
+                )
+
+                if (finalRect) {
+                    const plateCrop = sourceForDetection.roi(finalRect).clone()
+                    const parsedPlate = await detectPlate(plateCrop)
+                    plateCrop.delete()
+                    parsedPlate.box = [finalRect.x, finalRect.y, finalRect.width, finalRect.height]
+                    parsedPlate.probability = chosenDetection.confidence
+                    box.plate = parsedPlate
+                }
+
+                if (rotatedCar) {
+                    rotatedCar.delete()
+                }
+                roi.delete()
             }
             if (src) {
                 src.delete()
@@ -576,11 +426,124 @@ export function refinePlateForTLC(plateText:string): [string, boolean] {
     return [plateText, tlc]
 }
 
+function deskewPlateMat(source: Mat): Mat {
+    const angle = estimateSkewAngleDeg(source)
+    if (Math.abs(angle) < 0.2) {
+        return source.clone();
+    }
+
+    const deskewed = new cv.Mat();
+    const center = new cv.Point(source.cols / 2, source.rows / 2);
+    const rotation = cv.getRotationMatrix2D(center, -angle, 1.0);
+    cv.warpAffine(
+        source,
+        deskewed,
+        rotation,
+        new cv.Size(source.cols, source.rows),
+        cv.INTER_LINEAR,
+        cv.BORDER_REPLICATE
+    );
+    rotation.delete();
+    return deskewed;
+}
+
+function estimateSkewAngleDeg(source: Mat): number {
+    const gray = new cv.Mat();
+    if (source.channels() === 4) {
+        cv.cvtColor(source, gray, cv.COLOR_RGBA2GRAY);
+    } else if (source.channels() === 3) {
+        cv.cvtColor(source, gray, cv.COLOR_BGR2GRAY);
+    } else {
+        source.copyTo(gray);
+    }
+
+    const blurred = new cv.Mat();
+    cv.GaussianBlur(gray, blurred, new cv.Size(3, 3), 0);
+
+    const edges = new cv.Mat();
+    cv.Canny(blurred, edges, 40, 120, 3, false);
+
+    const lines = new cv.Mat();
+    cv.HoughLinesP(
+        edges,
+        lines,
+        1,
+        Math.PI / 180,
+        20,
+        Math.max(16, Math.floor(source.cols * 0.25)),
+        Math.max(8, Math.floor(source.cols * 0.05))
+    );
+
+    let weightedAngle = 0;
+    let totalWeight = 0;
+    if (lines.rows > 0) {
+        for (let i = 0; i < lines.rows; i++) {
+            const x1 = lines.data32S[i * 4];
+            const y1 = lines.data32S[i * 4 + 1];
+            const x2 = lines.data32S[i * 4 + 2];
+            const y2 = lines.data32S[i * 4 + 3];
+
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.hypot(dx, dy);
+            if (length < 10) {
+                continue;
+            }
+
+            let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            while (angle > 90) angle -= 180;
+            while (angle < -90) angle += 180;
+            if (Math.abs(angle) > 45) {
+                continue;
+            }
+
+            weightedAngle += angle * length;
+            totalWeight += length;
+        }
+    }
+
+    lines.delete();
+    edges.delete();
+    blurred.delete();
+    gray.delete();
+    return totalWeight > 0 ? (weightedAngle / totalWeight) : 0;
+}
+
+function rotateMatExpand(source: Mat, angleDeg: number): Mat {
+    const radians = angleDeg * Math.PI / 180;
+    const absCos = Math.abs(Math.cos(radians));
+    const absSin = Math.abs(Math.sin(radians));
+    const boundW = Math.ceil(source.rows * absSin + source.cols * absCos);
+    const boundH = Math.ceil(source.rows * absCos + source.cols * absSin);
+
+    const center = new cv.Point(source.cols / 2, source.rows / 2);
+    const rotation = cv.getRotationMatrix2D(center, angleDeg, 1.0);
+    rotation.data64F[2] += (boundW / 2) - center.x;
+    rotation.data64F[5] += (boundH / 2) - center.y;
+
+    const rotated = new cv.Mat();
+    cv.warpAffine(
+        source,
+        rotated,
+        rotation,
+        new cv.Size(boundW, boundH),
+        cv.INTER_LINEAR,
+        cv.BORDER_REPLICATE
+    );
+    rotation.delete();
+    return rotated;
+}
+
 export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     await downloadAll(()=>{})
-    const matC4 = matC3.clone()
-    const matPad = matC4.clone()
-    cv.cvtColor(matPad, matPad, cv.COLOR_RGBA2GRAY); // RGBA to BGR
+    const deskewed = deskewPlateMat(matC3)
+    const matC4 = deskewed.clone()
+    const matPad = deskewed.clone()
+    if (matPad.channels() === 4) {
+        cv.cvtColor(matPad, matPad, cv.COLOR_RGBA2GRAY);
+    } else {
+        cv.cvtColor(matPad, matPad, cv.COLOR_BGR2GRAY);
+    }
     // cv.copyMakeBorder(matC3, matPad, 0, yPad, 0, xPad, cv.BORDER_CONSTANT)
     cv.resize(matPad, matPad, new cv.Size(140, 70))
 
@@ -688,7 +651,7 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
     plate.tlc = yoloClassIndexToLabel[label].endsWith("_TLC")
     plate.nypd = yoloClassIndexToLabel[label].endsWith("_PD")
     plate.stateConfidence = maxProbability
-    plate.image = await matToBlob(matC3)
+    plate.image = await matToBlob(deskewed)
     if (plate.text.startsWith('T') && plate.text.endsWith('C')) {
         plate.text = plate.text.replace(/I/g, '1');
         plate.text = plate.text.replace(/L/g, '1');
@@ -700,6 +663,7 @@ export async function detectPlate(matC3:Mat): Promise<PlateDetection> {
         plate.tlc = true
         plate.state = State.NY
     }
+    deskewed.delete()
     matC4.delete()
     return plate
 }

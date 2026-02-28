@@ -1,5 +1,5 @@
 import { Avatar, Box, LinearProgress, Typography } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import heic2any from "heic2any";
 
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
@@ -16,64 +16,68 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewText, setPreviewText] = useState("Processing...");
-  const prevFileRef = useRef<File>();
-  const previewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (prevFileRef.current !== file) {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
-      }
-      setImageSrc(null);
-      setPreviewText("Processing preview...");
-      setPreviewProgress(10);
+    let cancelled = false;
+    let localUrl: string | null = null;
+    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
 
-      const processFile = async () => {
-        try {
-          let blob: Blob;
-          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
-            setPreviewText("Converting HEIC...");
-            setPreviewProgress(45);
-            onProcessingChange?.(id, { text: "Converting HEIC...", progress: 45 });
-            blob = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 1,
-            }) as Blob;
-            setPreviewProgress(80);
-            onProcessingChange?.(id, { text: "Converting HEIC...", progress: 80 });
-          } else {
-            blob = file;
-            setPreviewProgress(70);
+    setImageSrc(null);
+    setPreviewText("Processing preview...");
+    setPreviewProgress(10);
+
+    const processFile = async () => {
+      try {
+        let blob: Blob;
+        if (isHeic) {
+          setPreviewText("Converting HEIC...");
+          setPreviewProgress(45);
+          onProcessingChange?.(id, { text: "Converting HEIC...", progress: 45 });
+          blob = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 1,
+          }) as Blob;
+          if (cancelled) {
+            return;
           }
-
+          setPreviewProgress(80);
+          onProcessingChange?.(id, { text: "Converting HEIC...", progress: 80 });
           setPreviewText("Rendering preview...");
-          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
-            onProcessingChange?.(id, { text: "Rendering HEIC preview...", progress: 92 });
-          }
-          const blobUrl = URL.createObjectURL(blob);
-          previewUrlRef.current = blobUrl;
-          setImageSrc(blobUrl);
-          setPreviewProgress(100);
-          if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
-            onProcessingChange?.(id, { text: "HEIC ready", progress: 100 });
-            onProcessingChange?.(id, undefined);
-          }
-          prevFileRef.current = file;
-        } catch (err) {
-          console.error("Failed to process file", err);
-          setPreviewText("Preview failed");
-          onProcessingChange?.(id, undefined);
+          onProcessingChange?.(id, { text: "Rendering HEIC preview...", progress: 92 });
+        } else {
+          blob = file;
+          setPreviewText("Rendering preview...");
+          setPreviewProgress(70);
         }
-      };
-      processFile();
-    }
+
+        localUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(localUrl);
+          localUrl = null;
+          return;
+        }
+
+        setImageSrc(localUrl);
+        setPreviewProgress(100);
+        setPreviewText("Ready");
+        if (isHeic) {
+          onProcessingChange?.(id, { text: "HEIC ready", progress: 100 });
+        }
+        onProcessingChange?.(id, undefined);
+      } catch (err) {
+        console.error("Failed to process file", err);
+        setPreviewText("Preview failed");
+        onProcessingChange?.(id, undefined);
+      }
+    };
+
+    void processFile();
 
     return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
+      cancelled = true;
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
       }
       onProcessingChange?.(id, undefined);
     };
@@ -102,10 +106,7 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
     )
   }
 
-  let component = 'img'
-  if(file.type.indexOf('video')!=-1) {
-    component = 'video'
-  }
+  const isVideo = file.type.indexOf('video')!=-1
   return (
     <Box
     sx={{
@@ -116,29 +117,41 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
       position: "relative",
       justifyContent: 'center',
       marginRight: '.3rem', // Apply the outer margin
-      borderRadius: '10px', // Optional: Match the inner Box rounding      
+      borderRadius: '10px', // Optional: Match the inner Box rounding
       border: '1px solid #ccc', // Optional: Add a border to the wrapper
     }}
   >
-    <Box
-      src={imageSrc}
-      component={component}
-      alt="Uploaded Preview"
-      onClick={onClick}
-      sx={{
-        aspectRatio: '1/1',
-        height: 'auto',
-        width: '100%', // Adjust width to fill parent
-        objectFit: 'cover',
-        objectPosition: 'center',
-        transition: 'transform 0.1s ease',
-        "&:hover": {
-          transform: 'scale(1.05)', // Smooth hover effect
+    {isVideo ? (
+      <video
+        src={imageSrc}
+        onClick={onClick}
+        style={{
+          aspectRatio: '1 / 1',
+          height: 'auto',
+          width: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          borderRadius: '10px',
           cursor: 'pointer',
-        },
-        borderRadius: '10px', // Optional: Keep inner rounding
-      }}
-    />
+        }}
+      />
+    ) : (
+      <img
+        src={imageSrc}
+        alt="Uploaded Preview"
+        onClick={onClick}
+        style={{
+          aspectRatio: '1 / 1',
+          height: 'auto',
+          width: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          transition: 'transform 0.1s ease',
+        }}
+      />
+    )}
     <Box sx={{
       position: "absolute",
       zIndex: 100,

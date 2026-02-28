@@ -340,34 +340,41 @@ function App() {
       }
     }
 
-    for (const file of (filez || [])) {
-      if (plate?.image) {
-        break
-      
-      if(file.type.indexOf('image/')==-1) {
-        return
-      }}
-      segment(file)
-        .then(result => {
-          console.log("segmented file")
-          if (result) {
-            const carWithPlates = result.filter(res => res.plate != null)
-            setResults(carWithPlates)
-            if (carWithPlates && carWithPlates[0]) {
-              const carWithPlate = carWithPlates[0]
-              if (!car) {
-                setCar(carWithPlate)
-                setPlate(carWithPlate.plate!)
+    // Yield once so dropped files render in UI before expensive work starts.
+    setTimeout(() => {
+      const processFiles = async () => {
+        for (const file of (filez || [])) {
+          if (file.type.indexOf('image/') === -1) {
+            continue
+          }
+
+          // Run EXIF extraction in background for each image.
+          void exifGetter(file).catch(console.log)
+
+          // Stop auto-seg once we already have a plate.
+          if (plate?.image) {
+            continue
+          }
+
+          try {
+            const result = await segment(file)
+            if (result) {
+              const carWithPlates = result.filter(res => res.plate != null)
+              setResults(carWithPlates)
+              if (carWithPlates && carWithPlates[0]) {
+                const carWithPlate = carWithPlates[0]
+                setCar((prev) => prev || carWithPlate)
+                setPlate((prev) => prev || carWithPlate.plate!)
+                break
               }
             }
+          } catch (error) {
+            console.log(error)
           }
-        }).catch(error => {
-          console.log(error)
-        })
-      exifGetter(file).then(ok => {
-
-      })
-    }
+        }
+      }
+      void processFiles()
+    }, 0)
   }
   const heicStates = Object.values(heicProcessing)
   const isHeicProcessing = heicStates.length > 0
@@ -396,7 +403,6 @@ function App() {
       {showDragView && <LargeDragDropView onFiles={onFiles} onPrepareUpload={() => {
         void startModelWarmup()
       }} />}
-      <Box width="100%"><UserView ref={userRef} isSignedIn={isSignedIn != undefined} handleSuccess={handleSuccess} handleError={handleError} /></Box>
       <Box
         display="flex"
         flexDirection={{ xs: "column", md: "row" }}
@@ -433,8 +439,19 @@ function App() {
             "& > *:first-of-type": {
               marginTop: { xs: 2, md: 0 },
             },
+            "& > *:nth-of-type(2)": {
+              marginTop: { xs: 3, md: 3 },
+            },
           }}
         >
+          <Paper sx={{ width: "100%", p: 1 }}>
+            <UserView
+              ref={userRef}
+              isSignedIn={isSignedIn != undefined}
+              handleSuccess={handleSuccess}
+              handleError={handleError}
+            />
+          </Paper>
           <Paper sx={{ width: "100%", position: "relative", paddingTop: 3, overflow: "visible" }}>
             <ComplaintsView
               showCaption={true}
@@ -465,7 +482,7 @@ function App() {
               }}>
               {[...(files || [])].map((x, index) => {
                 const id = `${x.name}_${x.lastModified}_${x.size}`
-                return <FileUploadPreview id={id} onProcessingChange={onHeicProcessingChange} onClick={() => {
+                return <FileUploadPreview key={id} id={id} onProcessingChange={onHeicProcessingChange} onClick={() => {
                   setCurrentFile(index)
                 }} file={x} onClickDelete={() => {
                   onHeicProcessingChange(id, undefined)
@@ -567,6 +584,8 @@ function App() {
               // setBoxes(result)
               setCar(car)
               setPlate(car.plate!)
+            }} onPlate={(manualPlate) => {
+              setPlate(manualPlate)
             }} />
           }
         </Box>

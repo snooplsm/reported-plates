@@ -48,46 +48,39 @@ export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handle
     }, [isSignedIn])
     return (<Box
         display="flex"
-        width="100%" // Full width
-        flexDirection="row-reverse"
+        width="100%"
+        flexDirection="row"
         sx={{
-            alignItems: "center"
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1
         }}
     >
-        <Box sx={{ width: "1%", marginTop: 1 }}>
-        </Box>
-        <Box src="./reported.svg" component="img" sx={{
-            aspectRatio: "1/1",
-            marginTop: .5,
-            height: "60px",
-            borderRadius: 3,
-            objectFit: "contain",
-            flexShrink: 0,
-            cursor: "pointer",
-            transition: "transform   0.1s ease", // Smooth hover effect
-          "&:hover": {
-            transform: "scale(1.09)", // Scale image on hover        
-            cursor: "pointer"
-          }
-        }} onClick={()=> nav('/')}
-        />
-        <Box sx={{ width: "1%" }}>
-        </Box>
         <Box
+            src="./reported.svg"
+            component="img"
             sx={{
-                marginLeft: "auto",
-                right: 0
+                aspectRatio: "1/1",
+                height: "52px",
+                borderRadius: 3,
+                objectFit: "contain",
+                flexShrink: 0,
+                cursor: "pointer",
+                transition: "transform 0.1s ease",
+                "&:hover": {
+                    transform: "scale(1.06)",
+                    cursor: "pointer"
+                }
             }}
-        >
-            <>{!isSignedIn && <Box component={"div"} id="googlelogin"><GoogleLogin
-                shape="pill"                
+            onClick={() => nav('/')}
+        />
+        <Box>
+            {!isSignedIn && <Box component={"div"} id="googlelogin"><GoogleLogin
+                shape="pill"
                 onSuccess={handleSuccess}
                 onError={handleError}
-            // Optionally, you can customize the button appearance and behavior
             /></Box>}
-            {isSignedIn && <BasicSpeedDial avatarUrl={avatar} />}</>
-        
-        </Box>        
-
+            {isSignedIn && <BasicSpeedDial avatarUrl={avatar} />}
+        </Box>
     </Box>)
-})
+}) 

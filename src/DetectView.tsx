@@ -32,10 +32,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
     const [scale, setScale] = useState<number>(1); // Track zoom level
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
-    const [transformOrigin, setTransformOrigin] = useState<{ x: string; y: string }>({
-        x: "center",
-        y: "center",
-    }); // Track zoom origin
 
     const selectedOptionToCursor: Record<CanvasOption, [React.ReactElement, string]> = {
         [CanvasOption.Pan]: [<PanToolIcon />, "grab"],
@@ -65,9 +61,42 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
     const [isPanning, setIsPanning] = useState(false);
     const [position, setPosition] = useState([0, 0, 0, 0]);
     const [boundingBox, setBoundingBox] = useState<[x1: number, y1: number, x2: number, y2: number]>()
+    const clampOffsets = (nextScale: number, proposedOffsetX: number, proposedOffsetY: number) => {
+        if (!boxRef.current || !imgRef.current || nextScale <= 1) {
+            return { x: 0, y: 0 }
+        }
+        const container = boxRef.current.getBoundingClientRect();
+        const baseWidth = imgRef.current.clientWidth;
+        const baseHeight = imgRef.current.clientHeight;
+        const scaledWidth = baseWidth * nextScale;
+        const scaledHeight = baseHeight * nextScale;
+
+        const minX = Math.min(0, container.width - scaledWidth);
+        const minY = Math.min(0, container.height - scaledHeight);
+
+        return {
+            x: Math.max(minX, Math.min(0, proposedOffsetX)),
+            y: Math.max(minY, Math.min(0, proposedOffsetY)),
+        }
+    }
+
+    const getCanvasPoint = (e: React.MouseEvent) => {
+        if(!canvasRef.current) {
+            return null
+        }
+        const rect = canvasRef.current.getBoundingClientRect();
+        const scaleX = canvasRef.current.width / rect.width;
+        const scaleY = canvasRef.current.height / rect.height;
+        const x = Math.max(0, Math.min(canvasRef.current.width, (e.clientX - rect.left) * scaleX));
+        const y = Math.max(0, Math.min(canvasRef.current.height, (e.clientY - rect.top) * scaleY));
+        return { x, y }
+    }
 
     const onMouseDown = (e: React.MouseEvent) => {
         if(!canvasRef.current) {
+            return
+        }
+        if (e.button !== 0) {
             return
         }
         e.preventDefault()
@@ -76,17 +105,17 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         }
         if (selectedOption === CanvasOption.Pan) {
             setIsPanning(true)
+            setPosition([e.clientX, e.clientY, 0, 0])
+            return
         }
-        const rect = e.currentTarget.getBoundingClientRect();
-
-        const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
-        const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-
-        // Adjust coordinates for the canvas scale and offset
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-
-        setPosition([x, y])
+        const point = getCanvasPoint(e)
+        if (!point) {
+            return
+        }
+        setPosition([point.x, point.y])
+        if (selectedOption === CanvasOption.Label) {
+            setBoundingBox([point.x, point.y, point.x, point.y])
+        }
     }
 
     useEffect(() => {
@@ -128,67 +157,67 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                 const y2 = scaledBox[3] / scaleY2
                 console.log(x1, y1, x2, y2)
                 const rectRoi = new cv.Rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1))
-                console.log(rectRoi)
-                const roi = mat.roi(rectRoi)
-                cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
-                mat.delete()
-                const plate = await detectPlate(roi)
-                // setPlateOverride(plate)
-                if(plate && onPlate) {
-                    onPlate(plate)
-                }
-                roi.delete()
+                await runPlateFromRect(mat, rectRoi)
             }
         }
         setIsDragging(false)
         setIsPanning(false)
     }
 
+    const runPlateFromRect = async (mat: cv.Mat, rectRoi: cv.Rect) => {
+        const roi = mat.roi(rectRoi)
+        cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
+        mat.delete()
+        const foundPlate = await detectPlate(roi)
+        if (foundPlate) {
+            setPlate(foundPlate)
+            onPlate?.(foundPlate)
+        }
+        roi.delete()
+    }
+
     const onMouseMove = (e: React.MouseEvent) => {
-        if(!canvasRef.current) {
+        const point = getCanvasPoint(e)
+        if (!point) {
             return
         }
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
-        const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-
-        // Adjust coordinates for the canvas scale and offset
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
+        const { x, y } = point
 
         if (isDragging) {
-            // console.log("pressed", "x:",x.toFixed(4), "y:",y.toFixed(4), 
-            // "scaleX:", scaleX.toFixed(4), "scaleY", scaleY.toFixed(4), "offsetX:", offsetX.toFixed(4)+"%", "offsetY:",
-            // offsetY.toFixed(4)+"%", "scale:", scale.toFixed(4), "rw:",rect.width.toFixed(4), "rh:",rect.height.toFixed(4), "rl:", rect.left.toFixed(4), "rt:",rect.top.toFixed(4))
             const box:[x1: number, y1: number, x2: number, y2: number] = [position[0], position[1], x, y]
-            console.log("box", box, "width", rect.width)
             setBoundingBox(box)
         } else if (isPanning) {
-            console.log("isPanning")
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-
-            const dx = (position[0] - x) / scale;
-            const dy = (position[1] - y) / scale;
-            setOffsetX((prevOffsetX) => prevOffsetX + dx);
-            setOffsetY((prevOffsetY) => prevOffsetY + dy);
-
-            setPosition([x, y])
+            const dx = e.clientX - position[0];
+            const dy = e.clientY - position[1];
+            const next = clampOffsets(scale, offsetX + dx, offsetY + dy)
+            setOffsetX(next.x);
+            setOffsetY(next.y);
+            setPosition([e.clientX, e.clientY, 0, 0])
         }
     }
 
-    useEffect(() => {
-        setTransformOrigin({
-            x: `${offsetX}%`,
-            y: `${offsetY}%`,
-        });
-    }, [offsetX, offsetY])
-
     const handleWheel = (e: WheelEvent) => {
         e.preventDefault();
+        if (!boxRef.current) {
+            return
+        }
+        const rect = boxRef.current.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+        const zoomFactor = Math.exp(-e.deltaY * 0.0015);
+        const newScale = Math.min(Math.max(scale * zoomFactor, 1), 8);
+        if (newScale === scale) {
+            return
+        }
 
-        const newScale = scale + e.deltaY * -0.004; // Adjust scale
-        setScale(Math.min(Math.max(newScale, 1), 8)); // Clamp zoom level between 1x and 5x
+        const worldX = (cursorX - offsetX) / scale;
+        const worldY = (cursorY - offsetY) / scale;
+        const rawOffsetX = cursorX - worldX * newScale;
+        const rawOffsetY = cursorY - worldY * newScale;
+        const next = clampOffsets(newScale, rawOffsetX, rawOffsetY)
+        setScale(newScale);
+        setOffsetX(next.x);
+        setOffsetY(next.y);
     };
 
     useEffect(() => {
@@ -236,7 +265,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                 container.removeEventListener("wheel", handleWheel);
             }
         };
-    }, [boxRef.current, scale])
+    }, [boxRef.current, scale, offsetX, offsetY])
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -268,13 +297,35 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
 
     }, [scale, boundingBox, offsetX, offsetY])
 
+    useEffect(() => {
+        const syncCanvasSize = () => {
+            const canvas = canvasRef.current
+            const image = imgRef.current
+            if (!canvas || !image) {
+                return
+            }
+            const nextWidth = Math.max(1, Math.round(image.clientWidth))
+            const nextHeight = Math.max(1, Math.round(image.clientHeight))
+            if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+                canvas.width = nextWidth
+                canvas.height = nextHeight
+            }
+        }
+
+        syncCanvasSize()
+        window.addEventListener("resize", syncCanvasSize)
+        return () => {
+            window.removeEventListener("resize", syncCanvasSize)
+        }
+    }, [imageSrc])
+
     if (file == null) {
         return null
     } else
         return (
             <Paper sx={{
                 position: "relative",
-                overflow: "auto",
+                overflow: "hidden",
                 margin: 1,
                 width: "auto",
                 height: "auto"
@@ -285,42 +336,51 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                         position: "relative",
                         overflow: "hidden",
                         width: "auto",
+                        touchAction: "none",
                     }}
                     onMouseDown={onMouseDown}
                     onMouseUp={onMouseUp}
                     onMouseLeave={onMouseUp}
                     onMouseMove={onMouseMove}
                 >
-
-                    {imageSrc && <img
-                        ref={imgRef}
-                        src={imageSrc}
+                    <Box
                         style={{
-                            transform: `scale(${scale})`,
-                            transformOrigin: `${transformOrigin.x} ${transformOrigin.y}`, // Adjust based on mouse location
-                            width: "100%",
-                            height: "auto",
-                            display: "block", // Prevent inline-block issues
-                            cursor: cursor,
+                            position: "relative",
+                            transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
+                            transformOrigin: "0 0",
+                            willChange: "transform",
                         }}
-                    />}
-                    <canvas
-                        ref={canvasRef}
-                        style={{
-                            position: "absolute", // Overlay canvas on top of the image
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            height: "auto",
-                            display: "block", // Ensures the canvas behaves like an inline element
-                            cursor: cursor,
-                            pointerEvents: "auto"
-                        }}
-                    />
+                    >
+                        {imageSrc && <img
+                            ref={imgRef}
+                            src={imageSrc}
+                            style={{
+                                width: "100%",
+                                height: "auto",
+                                display: "block",
+                                cursor: cursor,
+                            }}
+                        />}
+                        <canvas
+                            ref={canvasRef}
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                                display: "block",
+                                cursor: cursor,
+                                pointerEvents: "auto"
+                            }}
+                        />
+                    </Box>
                 </Box>
                 <Box sx={{
                     position: "absolute",
-                    bottom: 0
+                    top: 8,
+                    right: 8,
+                    zIndex: 10,
                 }}>
                 <ToggleButtonGroup
                     value={selectedOption}
@@ -329,7 +389,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     aria-label="Pan or Label"
                     sx={{
                         gap: "0.5rem",
-                        margin: "1rem",
                         background: "#cccccc44"
                     }}
                 >

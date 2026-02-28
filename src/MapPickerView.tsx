@@ -2,7 +2,7 @@ import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import L, { LatLng } from 'leaflet';
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Feature, fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
-import Box from '@mui/material/Box';
+import { Box, Typography } from '@mui/material';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIconRetina from 'leaflet/dist/images/marker-icon-2x.png';
@@ -153,9 +153,15 @@ export const MapPickerView = ({ latLng, location, onLocationChange = () => { } }
                 }}
                 center={center}
                 zoom={16}
-                scrollWheelZoom={true}>
+                scrollWheelZoom={true}
+                attributionControl={false}>
                     <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    />
+                    <TileLayer
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
+                        opacity={0.99}
                     />
                     <DraggableMarker center={center} onDragEnd={onDragEnd}>
                         <Popup>
@@ -164,6 +170,18 @@ export const MapPickerView = ({ latLng, location, onLocationChange = () => { } }
                         </Popup>
                     </DraggableMarker>
                 </MapContainer>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        display: "block",
+                        textAlign: "right",
+                        mt: 0.5,
+                        color: "text.secondary",
+                        fontSize: "0.65rem"
+                    }}
+                >
+                    Map data © OpenStreetMap contributors, © CARTO
+                </Typography>
             </Box>
         </>
     )
