@@ -79,6 +79,18 @@ export enum State {
   export const states: StatePres[] = [
     NYSTATE,
     {
+      state: State.USPS,
+      top: { bg: "#00000000", text: "USPS", color: "#000"},
+      bottom: { bg: "#00000000", text: "United States Postal Service", color: "#000" },
+      plate: { bg: "#FFF", color: "#000" },
+    },
+    {
+      state: State.NYPD,
+      top: { bg: "#00000000", text: "NYPD", color: "#000"},
+      bottom: { bg: "#00000000", text: "New York Police Department", color: "#FFF" },
+      plate: { bg: "#FFF", color: "#000080" },
+    },
+    {
       state: State.PA,
       top: {
         bg: "#0E1756",
@@ -415,19 +427,6 @@ export enum State {
       top: { bg: "#00000000", text: "Diplomatic", color: "#000"},
       bottom: { bg: "#00000000", text: "Diplomatic Plate", color: "#FFF" },
       plate: { bg: "#FFF", color: "#000" },},
-      {
-        state: State.USPS, // Add USPS to your State enum if not already present
-        top: { bg: "#00000000", text: "USPS", color: "#000"},
-        bottom: { bg: "#00000000", text: "United States Postal Service", color: "#000" },
-        plate: { bg: "#FFF", color: "#000" },
-      },
-      // NYPD Plate
-      {
-        state: State.NYPD, // Add NYPD to your State enum if not already present
-        top: { bg: "#00000000", text: "NYPD", color: "#000"},
-        bottom: { bg: "#00000000", text: "New York Police Department", color: "#FFF" },
-        plate: { bg: "#000080", color: "#FFF" }, // Blue background with white text
-      },
     // Add remaining states in the same format
   ];
 

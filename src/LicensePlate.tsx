@@ -16,13 +16,15 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
   const [bottomTextColor, setBottomTextColor] = useState(NYSTATE.bottom.color)
   const [bottomBgColor, setBottomBgColor] = useState(NYSTATE.bottom.bg)
   const [plateText, setPlateText] = useState("")
-  const [menuOpen,setMenuOpen] = useState(false)
+  const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null)
+  const [stateQuery, setStateQuery] = useState("")
 
   const [plateState, setPlateState] = useState(NYSTATE)
 
   const handleMenuItemClick = (state:StatePres) => {
     setPlateState(state);
-    setMenuOpen(false);
+    setMenuAnchorEl(null);
+    setStateQuery("");
   };
 
 
@@ -195,7 +197,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
       <Tooltip title="Click to change" placement="top">
         <Typography
           ref={anchorRef}
-          onClick={()=>setMenuOpen(true)}
+          onClick={(e) => setMenuAnchorEl(e.currentTarget)}
           sx={{
             fontSize: "clamp(0.6rem, 2.6vw, 1rem)",
             color: plateState.top.color,
@@ -213,9 +215,12 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
       </Tooltip>
 
       <Menu
-        open={menuOpen}
-        anchorEl={anchorRef.current}
-        onClose={()=> setMenuOpen(false)}
+        open={Boolean(menuAnchorEl)}
+        anchorEl={menuAnchorEl}
+        onClose={()=> {
+          setMenuAnchorEl(null)
+          setStateQuery("")
+        }}
         anchorOrigin={{
           vertical: "bottom",
           horizontal: "center",
@@ -224,17 +229,71 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
           vertical: "top",
           horizontal: "center",
         }}
+        keepMounted
+        disableScrollLock
+        slotProps={{
+          list: {
+            dense: true,
+            sx: {
+              py: 0.5,
+            }
+          },
+          paper: {
+            sx: {
+              mt: 0.5,
+              maxHeight: "52vh",
+              width: "min(92vw, 360px)",
+              borderRadius: 2,
+              border: "1px solid rgba(0,0,0,0.08)",
+              boxShadow: "0 10px 28px rgba(0,0,0,0.16)"
+            }
+          }
+        }}
       >
-        {states.map((state, index) => (
+        <Box sx={{ px: 1, pt: 1, pb: 0.75, position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
+          <TextField
+            autoFocus
+            size="small"
+            fullWidth
+            placeholder="Search state..."
+            value={stateQuery}
+            onChange={(e) => setStateQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 1.5,
+              }
+            }}
+          />
+        </Box>
+        {states
+          .filter((state) => {
+            const q = stateQuery.trim().toLowerCase()
+            if (!q) return true
+            const topText = `${state.top?.text || ""}`.toLowerCase()
+            const stateCode = `${state.state}`.toLowerCase()
+            return topText.includes(q) || stateCode.includes(q)
+          })
+          .map((state, index) => (
           <MenuItem
             onClick={() => handleMenuItemClick(state)}
             key={`${state.state}_${index}`}
             value={state.state}
+            selected={plateState.state === state.state}
+            sx={{
+              px: 1.25,
+              py: 0.75,
+              borderTop: "1px solid rgba(0,0,0,0.04)",
+              "&.Mui-selected": {
+                backgroundColor: "rgba(25, 118, 210, 0.1)",
+              }
+            }}
           >
             <Typography
               sx={{
-                fontSize: "1.5rem",
+                fontSize: "0.95rem",
                 fontWeight: 600,
+                lineHeight: 1.2,
               }}
             >
               {`${state.top?.text || "No Text"}`}
