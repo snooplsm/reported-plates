@@ -1,6 +1,5 @@
 import { Box } from "@mui/material"
 import { Complaint, ComplaintsView } from "./Complaints"
-import { useEffect } from "react";
 
 interface LargeDragProps {
     onFiles: (complaint:Complaint | undefined, files: File[]) => void
@@ -8,21 +7,6 @@ interface LargeDragProps {
 }
 
 export const LargeDragDropView = ({onFiles, onPrepareUpload}:LargeDragProps) => {
-
-      const handleDragEnd = () => {
-        onFiles(undefined,[])
-        console.log("Drag ended");
-      };
-    
-      useEffect(() => {
-        // Add global dragend listener
-        window.addEventListener("mousemove", handleDragEnd);
-    
-        return () => {
-          // Cleanup
-          window.removeEventListener("mousemove", handleDragEnd);
-        };
-      }, []);
 
     return <Box sx={{
         width: "100%",
@@ -34,6 +18,15 @@ export const LargeDragDropView = ({onFiles, onPrepareUpload}:LargeDragProps) => 
         justifyContent: "center", // Center horizontally
         alignItems: "center", // Center vertically
         padding: 20
+    }}
+    onDragOver={(e) => {
+        e.preventDefault()
+    }}
+    onDrop={(e) => {
+        e.preventDefault()
+        if (e.dataTransfer.files.length === 0) {
+            onFiles(undefined, [])
+        }
     }}
     >
         <Box sx={{

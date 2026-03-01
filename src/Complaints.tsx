@@ -212,6 +212,12 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
             gap: 1,
           }}
+          onDrop={() => {
+            setHoveredIndex(undefined)
+          }}
+          onDragLeave={() => {
+            setHoveredIndex(undefined)
+          }}
         >
           {complaints.map((item, index) => {
             let filter = undefined
@@ -234,11 +240,11 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 onDragEnter={(e: DragEvent) => {
                   // console.log("drag enter")
                   setHoveredIndex(index)
-                  onPrepareUpload?.()
                   e.preventDefault()
                 }}
                 onDrop={(e: React.DragEvent<HTMLDivElement>) => {
                   handleDrop(onFiles, item, e)
+                  setHoveredIndex(undefined)
                 }}
                 onMouseEnter={(e) => {
                   setHoveredIndex(index)

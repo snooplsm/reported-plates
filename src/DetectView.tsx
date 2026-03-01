@@ -241,6 +241,13 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                 file2Use = URL.createObjectURL(file);
             }
             setImageSrc(file2Use);
+            // Always reset viewport when a new file is loaded so the full image is visible.
+            setScale(1)
+            setOffsetX(0)
+            setOffsetY(0)
+            setBoundingBox(undefined)
+            setIsDragging(false)
+            setIsPanning(false)
         };
 
         fetchImage();

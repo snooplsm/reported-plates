@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
-import cv from "@techstark/opencv-js";
 import * as ExifReader from 'exifreader';
 import { getFileHash } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
-import { DetectBox, downloadAll, PlateDetection, segment } from './api/segment';
+import type { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
 import { Button, CssBaseline, ThemeProvider, Paper, LinearProgress, useMediaQuery, } from "@mui/material";
 import theme from './theme';
-import DetectView from './DetectView';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import { Complaint, ComplaintsView } from './Complaints';
 import { StepView } from './StepView';
@@ -29,6 +27,8 @@ import { SubmissionPreview } from './SubmissionPreview';
 import { classifyVehicle } from './classifyVehicle';
 import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
 import { LargeDragDropView } from './LargeDragDropView';
+
+const DetectView = lazy(() => import('./DetectView'))
 
 function App() {
   const isMobile = useMediaQuery('(max-width:900px)')
@@ -120,6 +120,12 @@ function App() {
   const [reportDescription, setReportDescription] = useState<string>('')
 
   const [showDragView, setShowDragView] = useState(false)
+  const dragDepthRef = useRef(0)
+  const warmupWorkerRef = useRef<Worker | null>(null)
+  const warmupPromiseRef = useRef<Promise<void> | null>(null)
+  const segmentApiPromiseRef = useRef<Promise<typeof import('./api/segment')> | null>(null)
+  const autoDetectTimerRef = useRef<number | null>(null)
+  const autoDetectRunIdRef = useRef(0)
   const onHeicProcessingChange = useCallback((id: string, status?: { text: string; progress: number }) => {
     setHeicProcessing((prev) => {
       const next = { ...prev }
@@ -131,6 +137,105 @@ function App() {
       return next
     })
   }, [])
+
+  useEffect(() => {
+    const worker = new Worker(new URL('./workers/modelWarmup.worker.ts', import.meta.url), { type: 'module' })
+    warmupWorkerRef.current = worker
+
+    const onWorkerMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; payload?: { text?: string; progress?: number; message?: string } }
+      if (!data?.type) return
+      if (data.type === "progress" && data.payload?.progress != null && data.payload?.text) {
+        setIsModelLoading(true)
+        setModelLoadState({
+          text: data.payload.text,
+          progress: data.payload.progress,
+        })
+      } else if (data.type === "done") {
+        setModelsReady(true)
+        setIsModelLoading(false)
+        setModelLoadState({ text: "Models ready", progress: 100 })
+      } else if (data.type === "error") {
+        setIsModelLoading(false)
+        setModelLoadState({ text: "Model load failed", progress: 0 })
+        enqueueSnackbar(`Model load failed: ${data.payload?.message || "Unknown error"}`, {
+          variant: "warning",
+          autoHideDuration: 5000
+        })
+      }
+    }
+
+    worker.addEventListener("message", onWorkerMessage)
+
+    return () => {
+      worker.removeEventListener("message", onWorkerMessage)
+      worker.terminate()
+      warmupWorkerRef.current = null
+      warmupPromiseRef.current = null
+      if (autoDetectTimerRef.current != null) {
+        window.clearTimeout(autoDetectTimerRef.current)
+        autoDetectTimerRef.current = null
+      }
+    }
+  }, [])
+
+  const loadSegmentApi = () => {
+    if (!segmentApiPromiseRef.current) {
+      segmentApiPromiseRef.current = import('./api/segment')
+    }
+    return segmentApiPromiseRef.current
+  }
+
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types || []).includes("Files")
+
+    const onWindowDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      dragDepthRef.current += 1
+      setShowDragView(true)
+    }
+
+    const onWindowDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+    }
+
+    const onWindowDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+      if (dragDepthRef.current === 0) {
+        setShowDragView(false)
+      }
+    }
+
+    const onWindowDrop = (e: DragEvent) => {
+      e.preventDefault()
+      dragDepthRef.current = 0
+      setShowDragView(false)
+    }
+
+    const onWindowDragEnd = () => {
+      dragDepthRef.current = 0
+      setShowDragView(false)
+    }
+
+    window.addEventListener("dragenter", onWindowDragEnter)
+    window.addEventListener("dragover", onWindowDragOver)
+    window.addEventListener("dragleave", onWindowDragLeave)
+    window.addEventListener("drop", onWindowDrop)
+    window.addEventListener("dragend", onWindowDragEnd)
+
+    return () => {
+      window.removeEventListener("dragenter", onWindowDragEnter)
+      window.removeEventListener("dragover", onWindowDragOver)
+      window.removeEventListener("dragleave", onWindowDragLeave)
+      window.removeEventListener("drop", onWindowDrop)
+      window.removeEventListener("dragend", onWindowDragEnd)
+      dragDepthRef.current = 0
+    }
+  }, [modelsReady])
 
   useEffect(() => {
     const signedIn = async () => {
@@ -157,50 +262,41 @@ function App() {
     console.log('Google login failed');
   };
 
-  const runtimeReadyRef = useRef(typeof cv.Mat === "function")
-  const runtimeReadyPromiseRef = useRef<Promise<void> | null>(null)
-  const modelWarmupPromiseRef = useRef<Promise<void> | null>(null)
-
-  const ensureRuntimeReady = () => {
-    if (runtimeReadyRef.current || typeof cv.Mat === "function") {
-      runtimeReadyRef.current = true
-      return Promise.resolve()
-    }
-    if (runtimeReadyPromiseRef.current) {
-      return runtimeReadyPromiseRef.current
-    }
-    runtimeReadyPromiseRef.current = new Promise<void>((resolve) => {
-      cv["onRuntimeInitialized"] = () => {
-        runtimeReadyRef.current = true
-        resolve()
-      }
-    })
-    return runtimeReadyPromiseRef.current
-  }
-
-  const startModelWarmup = () => {
+  const startModelWarmup = useCallback(() => {
     if (modelsReady) {
       return Promise.resolve()
     }
-    if (modelWarmupPromiseRef.current) {
-      return modelWarmupPromiseRef.current
+    if (warmupPromiseRef.current) {
+      return warmupPromiseRef.current
     }
+    if (!warmupWorkerRef.current) {
+      return Promise.resolve()
+    }
+
     setIsModelLoading(true)
     setModelLoadState({
       text: "Preparing AI runtime...",
       progress: 5
     })
-    modelWarmupPromiseRef.current = (async () => {
-      await ensureRuntimeReady()
-      await downloadAll((progress) => {
-        setModelLoadState(progress)
-      })
-      setModelsReady(true)
-    })().finally(() => {
-      setIsModelLoading(false)
+    warmupPromiseRef.current = new Promise<void>((resolve) => {
+      if (!warmupWorkerRef.current) {
+        resolve()
+        return
+      }
+      const onMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: string }
+        if (data?.type === "done" || data?.type === "error") {
+          warmupWorkerRef.current?.removeEventListener("message", onMessage)
+          warmupPromiseRef.current = null
+          resolve()
+        }
+      }
+      warmupWorkerRef.current.addEventListener("message", onMessage)
+      warmupWorkerRef.current.postMessage({ type: "warmup" })
     })
-    return modelWarmupPromiseRef.current
-  }
+
+    return warmupPromiseRef.current
+  }, [modelsReady])
 
   const getReport = () => {
     const err: Set<ReportErrors> = new Set()
@@ -286,7 +382,6 @@ function App() {
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
     setShowDragView(false)
     if (filez && filez.length > 0) {
-      void startModelWarmup()
       const newFiles = new Set<File>(files)
       filez.forEach(file => {
         if (!fileNames.has(file.name)) {
@@ -340,41 +435,45 @@ function App() {
       }
     }
 
-    // Yield once so dropped files render in UI before expensive work starts.
-    setTimeout(() => {
+    // Let the UI paint first (hide drag overlay, update previews) before expensive work starts.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const processFiles = async () => {
-        for (const file of (filez || [])) {
-          if (file.type.indexOf('image/') === -1) {
-            continue
-          }
-
-          // Run EXIF extraction in background for each image.
+        const imageFiles = (filez || []).filter((file) => file.type.indexOf('image/') !== -1)
+        for (const file of imageFiles) {
           void exifGetter(file).catch(console.log)
-
-          // Stop auto-seg once we already have a plate.
-          if (plate?.image) {
-            continue
-          }
-
-          try {
-            const result = await segment(file)
-            if (result) {
-              const carWithPlates = result.filter(res => res.plate != null)
-              setResults(carWithPlates)
-              if (carWithPlates && carWithPlates[0]) {
-                const carWithPlate = carWithPlates[0]
-                setCar((prev) => prev || carWithPlate)
-                setPlate((prev) => prev || carWithPlate.plate!)
-                break
-              }
-            }
-          } catch (error) {
-            console.log(error)
-          }
         }
+
+        if (imageFiles.length === 0 || plate?.image) {
+          return
+        }
+
+        const runId = ++autoDetectRunIdRef.current
+        if (autoDetectTimerRef.current != null) {
+          window.clearTimeout(autoDetectTimerRef.current)
+        }
+        autoDetectTimerRef.current = window.setTimeout(() => {
+          const runDetection = async () => {
+            if (runId !== autoDetectRunIdRef.current) {
+              return
+            }
+            const { segment } = await loadSegmentApi()
+            const result = await segment(imageFiles[0])
+            if (!result || runId !== autoDetectRunIdRef.current) {
+              return
+            }
+            const carWithPlates = result.filter(res => res.plate != null)
+            setResults(carWithPlates)
+            if (carWithPlates[0]) {
+              const carWithPlate = carWithPlates[0]
+              setCar((prev) => prev || carWithPlate)
+              setPlate((prev) => prev || carWithPlate.plate!)
+            }
+          }
+          void runDetection().catch(console.log)
+        }, 1200)
       }
       void processFiles()
-    }, 0)
+    }))
   }
   const heicStates = Object.values(heicProcessing)
   const isHeicProcessing = heicStates.length > 0
@@ -400,9 +499,7 @@ function App() {
       }}>
         <LinearProgress variant="determinate" value={topBarValue} sx={{ height: 3 }} />
       </Paper>}
-      {showDragView && <LargeDragDropView onFiles={onFiles} onPrepareUpload={() => {
-        void startModelWarmup()
-      }} />}
+      {showDragView && <LargeDragDropView onFiles={onFiles} />}
       <Box
         display="flex"
         flexDirection={{ xs: "column", md: "row" }}
@@ -415,13 +512,6 @@ function App() {
           overflowX: "hidden",
         }}
         height={{ xs: "auto", md: "100vh" }}
-        onDragOver={(e) => {
-          // e.preventDefault()
-          setShowDragView(true)
-        }}
-        onDragEnter={() => {
-          void startModelWarmup()
-        }}
       >
         {/* Left Column */}
         <Box
@@ -461,9 +551,6 @@ function App() {
               selectedComplaint={complaint}
               onChange={(complaint) => {
                 setComplaint(complaint)
-              }}
-              onPrepareUpload={() => {
-                void startModelWarmup()
               }}
             />
             <StepView hasError={reportError && reportError.has(ReportErrors.NO_PHOTOS)} sx={{
@@ -579,14 +666,16 @@ function App() {
               setHoveredStep(step)
             }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
           {currentFile != undefined && currentFile >= 0 &&
-            <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
-              setResults(result)
-              // setBoxes(result)
-              setCar(car)
-              setPlate(car.plate!)
-            }} onPlate={(manualPlate) => {
-              setPlate(manualPlate)
-            }} />
+            <Suspense fallback={<Paper sx={{ p: 2 }}><LinearProgress /></Paper>}>
+              <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
+                setResults(result)
+                // setBoxes(result)
+                setCar(car)
+                setPlate(car.plate!)
+              }} onPlate={(manualPlate) => {
+                setPlate(manualPlate)
+              }} />
+            </Suspense>
           }
         </Box>
         <Box

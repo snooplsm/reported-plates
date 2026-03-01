@@ -70,23 +70,34 @@ export const downloadAll = async (onProgress?: (progress: DownloadProgressState)
                 }]
         ))
     })
-    downloading = Promise.all(promises).then(async result => {
-        onProgress?.({
-            text: "Initializing models...",
-            progress: 97
-        })
-        yolo = await InferenceSession.create(result[0]);
-        nms = await InferenceSession.create(result[1]);
-        plate = await InferenceSession.create(result[3]);
-        plateClass = await InferenceSession.create(result[4])
-        ocr = await InferenceSession.create(result[5]);
-        downloaded = true
-        downloading = null
-        onProgress?.({
-            text: "Models ready",
-            progress: 100
-        })
-    }).catch(console.log)
+    downloading = (async () => {
+        try {
+            const result = await Promise.all(promises)
+            onProgress?.({
+                text: "Initializing models...",
+                progress: 97
+            })
+            yolo = await InferenceSession.create(result[0]);
+            nms = await InferenceSession.create(result[1]);
+            plate = await InferenceSession.create(result[3]);
+            plateClass = await InferenceSession.create(result[4])
+            ocr = await InferenceSession.create(result[5]);
+            downloaded = true
+            onProgress?.({
+                text: "Models ready",
+                progress: 100
+            })
+        } catch (error) {
+            downloaded = false
+            onProgress?.({
+                text: "Model load failed",
+                progress: 0
+            })
+            throw error
+        } finally {
+            downloading = null
+        }
+    })()
     return downloading
 }
 

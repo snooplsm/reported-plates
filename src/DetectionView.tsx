@@ -1,7 +1,7 @@
 import { Box, IconButton, Typography } from "@mui/material"
 import LicensePlate from "./LicensePlate"
 import LicensePlateImage from "./LicensePlateImage"
-import { DetectBox, PlateDetection } from "./api/segment"
+import type { DetectBox, PlateDetection } from "./api/segment"
 import NextPlanOutlinedIcon from '@mui/icons-material/NextPlanOutlined';
 import { useEffect, useState } from "react";
 

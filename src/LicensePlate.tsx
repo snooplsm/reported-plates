@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Box,  Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
-import { PlateDetection, refinePlateForTLC } from "./api/segment";
+import type { PlateDetection } from "./api/segment";
+import { refinePlateForTLC } from "./utils/plate";
 import { NYSTATE, State,  StatePres,  states } from "./States";
 
 type LicensePlateProps = {

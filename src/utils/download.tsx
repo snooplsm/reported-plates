@@ -6,6 +6,7 @@ export const download = (
     const request = new XMLHttpRequest();
     request.open("GET", url, true);
     request.responseType = "arraybuffer";
+    request.timeout = 45000;
 
     if (logger) {
       const [text, setProgress] = logger
@@ -35,6 +36,13 @@ export const download = (
       reject({
         status: this.status,
         statusText: this.statusText,
+      });
+    };
+
+    request.ontimeout = function () {
+      reject({
+        status: this.status || 408,
+        statusText: "Request timeout",
       });
     };
 
