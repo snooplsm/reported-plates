@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { DetectBox, detectPlate, PlateDetection, segment } from './api/segment';
 import Box from '@mui/material/Box';
-import { ToggleButtonGroup, ToggleButton, Paper, IconButton, Tooltip } from '@mui/material';
+import { ToggleButtonGroup, ToggleButton, Paper, IconButton, Tooltip, useMediaQuery } from '@mui/material';
 import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -9,6 +9,7 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import cv from "@techstark/opencv-js";
 import heic2any from "heic2any";
 import FilterCenterFocusIcon from '@mui/icons-material/FilterCenterFocus';
+import { isHeicFile } from './api/file-utils';
 
 type DetectProps = {
     file: File; // The title displayed on the card
@@ -24,7 +25,20 @@ enum CanvasOption {
     ZoomOut = "ZoomOut"
 }
 
+type PointerPosition = { x: number; y: number }
+type PinchState = {
+    distance: number
+    scale: number
+    offsetX: number
+    offsetY: number
+    center: PointerPosition
+}
+
+const pointerDistance = (points: PointerPosition[]) => Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)
+const pointerCenter = (points: PointerPosition[]) => ({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 })
+
 const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
+    const isMobile = useMediaQuery('(max-width:900px)')
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
@@ -56,6 +70,8 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const imgRef = useRef<HTMLImageElement | null>(null);
     const boxRef = useRef<HTMLElement | null>(null);
+    const activePointersRef = useRef(new Map<number, PointerPosition>())
+    const pinchRef = useRef<PinchState | null>(null)
 
     const [isDragging, setIsDragging] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
@@ -80,26 +96,75 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         }
     }
 
-    const getCanvasPoint = (e: React.MouseEvent) => {
+    const getCanvasPoint = (clientX: number, clientY: number) => {
         if(!canvasRef.current) {
             return null
         }
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = canvasRef.current.width / rect.width;
         const scaleY = canvasRef.current.height / rect.height;
-        const x = Math.max(0, Math.min(canvasRef.current.width, (e.clientX - rect.left) * scaleX));
-        const y = Math.max(0, Math.min(canvasRef.current.height, (e.clientY - rect.top) * scaleY));
+        const x = Math.max(0, Math.min(canvasRef.current.width, (clientX - rect.left) * scaleX));
+        const y = Math.max(0, Math.min(canvasRef.current.height, (clientY - rect.top) * scaleY));
         return { x, y }
     }
 
-    const onMouseDown = (e: React.MouseEvent) => {
+    const zoomAtPoint = (clientX: number, clientY: number, zoomFactor: number) => {
+        if (!boxRef.current) {
+            return
+        }
+        const rect = boxRef.current.getBoundingClientRect()
+        const cursorX = clientX - rect.left
+        const cursorY = clientY - rect.top
+        const newScale = Math.min(Math.max(scale * zoomFactor, 1), 8)
+        if (newScale === scale) {
+            return
+        }
+
+        const worldX = (cursorX - offsetX) / scale
+        const worldY = (cursorY - offsetY) / scale
+        const rawOffsetX = cursorX - worldX * newScale
+        const rawOffsetY = cursorY - worldY * newScale
+        const next = clampOffsets(newScale, rawOffsetX, rawOffsetY)
+        setScale(newScale)
+        setOffsetX(next.x)
+        setOffsetY(next.y)
+    }
+
+    const onPointerDown = (e: React.PointerEvent) => {
         if(!canvasRef.current) {
             return
         }
-        if (e.button !== 0) {
+        if (e.pointerType === "mouse" && e.button !== 0) {
+            return
+        }
+        activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        const activePoints = [...activePointersRef.current.values()]
+        if (selectedOption === CanvasOption.Pan && activePoints.length === 2) {
+            e.preventDefault()
+            e.currentTarget.setPointerCapture(e.pointerId)
+            pinchRef.current = {
+                distance: Math.max(1, pointerDistance(activePoints)),
+                scale,
+                offsetX,
+                offsetY,
+                center: pointerCenter(activePoints),
+            }
+            setIsPanning(false)
+            return
+        }
+        if (isMobile && e.pointerType === "touch" && selectedOption === CanvasOption.Pan) {
             return
         }
         e.preventDefault()
+        e.currentTarget.setPointerCapture(e.pointerId)
+        if (selectedOption === CanvasOption.ZoomIn) {
+            zoomAtPoint(e.clientX, e.clientY, 1.35)
+            return
+        }
+        if (selectedOption === CanvasOption.ZoomOut) {
+            zoomAtPoint(e.clientX, e.clientY, 1 / 1.35)
+            return
+        }
         if (selectedOption === CanvasOption.Label) {
             setIsDragging(true)
         }
@@ -108,7 +173,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             setPosition([e.clientX, e.clientY, 0, 0])
             return
         }
-        const point = getCanvasPoint(e)
+        const point = getCanvasPoint(e.clientX, e.clientY)
         if (!point) {
             return
         }
@@ -122,7 +187,14 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         console.log("position changed", position)
     }, [position])
 
-    const onMouseUp = () => {
+    const onPointerEnd = (e: React.PointerEvent) => {
+        activePointersRef.current.delete(e.pointerId)
+        if (activePointersRef.current.size < 2) {
+            pinchRef.current = null
+        }
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+        }
         if (isDragging && boundingBox) {
             if(!canvasRef.current) {
                 return
@@ -176,11 +248,37 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         roi.delete()
     }
 
-    const onMouseMove = (e: React.MouseEvent) => {
-        const point = getCanvasPoint(e)
+    const onPointerMove = (e: React.PointerEvent) => {
+        if (activePointersRef.current.has(e.pointerId)) {
+            activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        }
+        const activePoints = [...activePointersRef.current.values()]
+        if (selectedOption === CanvasOption.Pan && activePoints.length === 2 && pinchRef.current && boxRef.current) {
+            e.preventDefault()
+            const start = pinchRef.current
+            const nextCenter = pointerCenter(activePoints)
+            const nextScale = Math.min(Math.max(start.scale * pointerDistance(activePoints) / start.distance, 1), 8)
+            const rect = boxRef.current.getBoundingClientRect()
+            const startX = start.center.x - rect.left
+            const startY = start.center.y - rect.top
+            const worldX = (startX - start.offsetX) / start.scale
+            const worldY = (startY - start.offsetY) / start.scale
+            const rawX = nextCenter.x - rect.left - worldX * nextScale
+            const rawY = nextCenter.y - rect.top - worldY * nextScale
+            const next = clampOffsets(nextScale, rawX, rawY)
+            setScale(nextScale)
+            setOffsetX(next.x)
+            setOffsetY(next.y)
+            return
+        }
+        if (isMobile && e.pointerType === "touch" && activePoints.length < 2) {
+            return
+        }
+        const point = getCanvasPoint(e.clientX, e.clientY)
         if (!point) {
             return
         }
+        e.preventDefault()
         const { x, y } = point
 
         if (isDragging) {
@@ -224,7 +322,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         const fetchImage = async () => {
             let file2Use: string;
 
-            if (file.type.toLowerCase() === "image/heic") {
+            if (isHeicFile(file)) {
                 const uuu = URL.createObjectURL(file);
                 try {
                     const blob: Blob = await (await fetch(uuu)).blob();
@@ -248,6 +346,8 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             setBoundingBox(undefined)
             setIsDragging(false)
             setIsPanning(false)
+            activePointersRef.current.clear()
+            pinchRef.current = null
         };
 
         fetchImage();
@@ -343,12 +443,13 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                         position: "relative",
                         overflow: "hidden",
                         width: "auto",
-                        touchAction: "none",
+                        touchAction: isMobile ? "pan-y" : (scale > 1 || selectedOption === CanvasOption.Label ? "none" : "pan-y"),
+                        overscrollBehavior: isMobile ? "auto" : (scale > 1 ? "contain" : "auto"),
                     }}
-                    onMouseDown={onMouseDown}
-                    onMouseUp={onMouseUp}
-                    onMouseLeave={onMouseUp}
-                    onMouseMove={onMouseMove}
+                    onPointerDown={onPointerDown}
+                    onPointerUp={onPointerEnd}
+                    onPointerCancel={onPointerEnd}
+                    onPointerMove={onPointerMove}
                 >
                     <Box
                         style={{
@@ -388,6 +489,9 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     top: 8,
                     right: 8,
                     zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.75,
                 }}>
                 <ToggleButtonGroup
                     value={selectedOption}
@@ -395,24 +499,27 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     onChange={handleToggle}
                     aria-label="Pan or Label"
                     sx={{
+                        display: { xs: "none", md: "inline-flex" },
                         gap: "0.5rem",
-                        background: "#cccccc44"
+                        background: "rgba(255,255,255,0.9)",
+                        boxShadow: 2,
                     }}
                 >
-                    <ToggleButton value={CanvasOption.Pan} aria-label="Pan">
+                    <ToggleButton key={CanvasOption.Pan} value={CanvasOption.Pan} aria-label="Pan">
                         {selectedOptionToCursor[CanvasOption.Pan]}
                     </ToggleButton>
-                    <ToggleButton value={CanvasOption.Label} aria-label="Label">
+                    <ToggleButton key={CanvasOption.Label} value={CanvasOption.Label} aria-label="Label">
                         {selectedOptionToCursor[CanvasOption.Label]}
                     </ToggleButton>
-                    <ToggleButton value={CanvasOption.ZoomIn} aria-label="ZoomIn">
+                    <ToggleButton key={CanvasOption.ZoomIn} value={CanvasOption.ZoomIn} aria-label="ZoomIn">
                         {selectedOptionToCursor[CanvasOption.ZoomIn]}
                     </ToggleButton>
-                    <ToggleButton value={CanvasOption.ZoomOut} aria-label="ZoomOut">
+                    <ToggleButton key={CanvasOption.ZoomOut} value={CanvasOption.ZoomOut} aria-label="ZoomOut">
                         {selectedOptionToCursor[CanvasOption.ZoomOut]}
                     </ToggleButton>
-                    <Tooltip title="Run plate detector on this image.">
-                    <IconButton aria-label="" onClick={()=> {
+                </ToggleButtonGroup>
+                <Tooltip title="Run plate detector on this image">
+                    <IconButton aria-label="Detect license plate" onClick={()=> {
                         segment(file)
                         .then(result=> {
                             if (result) {
@@ -427,7 +534,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                         <FilterCenterFocusIcon/>
                     </IconButton>
                 </Tooltip>
-                </ToggleButtonGroup>
                 </Box>
             </Paper>
         )

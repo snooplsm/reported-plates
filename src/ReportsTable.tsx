@@ -1,24 +1,21 @@
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
+import { Button, Stack } from '@mui/material';
 import { deleteReport, SimpleReport, Status } from './Auth';
 import moment from 'moment';
-import { IconButton, Menu, MenuItem } from '@mui/material';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import React from 'react';
 
 function formatCustomDate(date: Date, showAgo = true) {
     const now = moment();
     const givenDate = moment(date);
 
     const daysAgo = now.diff(givenDate, "days");
-    const hoursAgo = now.diff(givenDate, "hours") % 24; // Remaining hours after subtracting days
-
-    const formattedDate = givenDate.format("MM/D/YY h:mma \\(dddd\\)"); // Main date format
+    const hoursAgo = now.diff(givenDate, "hours") % 24;
+    const formattedDate = givenDate.format("MM/D/YY h:mma");
 
     let timeAgo = "";
     if (showAgo) {
         if (daysAgo > 0) {
-            timeAgo = `(${daysAgo}d${hoursAgo}h ago)`;
+            timeAgo = `(${daysAgo}d ${hoursAgo}h ago)`;
         } else {
             timeAgo = `(${hoursAgo}h ago)`;
         }
@@ -27,7 +24,7 @@ function formatCustomDate(date: Date, showAgo = true) {
     return `${formattedDate} ${timeAgo}`.trim();
 }
 
-const paginationModel = { page: 0, pageSize: 5 };
+const paginationModel = { page: 0, pageSize: 10 };
 
 interface ReportProps {
     reports?: SimpleReport[],
@@ -36,113 +33,106 @@ interface ReportProps {
     statuses?: Map<Number, Status>
 }
 
-export default function ReportsTable({ reports, onReports = () => {}, statuses, onReportClicked = () => { } }: ReportProps) {
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-    const open = Boolean(anchorEl);
-    const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-        setAnchorEl(event.currentTarget);
-    };
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
+const canDeleteReport = (report: SimpleReport) => {
+    return !report.reqnumber && Number(report.status ?? 0) === 0
+}
 
+export default function ReportsTable({ reports, onReports = () => {}, statuses, onReportClicked = () => { } }: ReportProps) {
     const columns: GridColDef[] = [
         {
-            field: 'id', headerName: 'Actions', width: 70,
+            field: 'actions',
+            headerName: 'Actions',
+            width: 150,
+            sortable: false,
+            filterable: false,
             renderCell: (params) => {
-                return (<div>
-                    <IconButton
-                        aria-label="more"
-                        id="long-button"
-                        aria-controls={open ? 'long-menu' : undefined}
-                        aria-expanded={open ? 'true' : undefined}
-                        aria-haspopup="true"
-                        onClick={handleClick}
-                    >
-                        <MoreVertIcon />
-                    </IconButton>
-                    <Menu
-                        id="long-menu"
-                        MenuListProps={{
-                            'aria-labelledby': 'long-button',
-                        }}
-                        anchorEl={anchorEl}
-                        open={open}
-                        onClose={handleClose}
-                        slotProps={{
-                            paper: {
-                                style: {
-                                    // maxHeight: ITEM_HEIGHT * 4.5,
-                                    width: '20ch',
-                                },
-                            },
+                const report = params.row as SimpleReport
+                return (<Stack direction="row" spacing={0.75} alignItems="center" sx={{ height: "100%" }}>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onReportClicked(report)
                         }}
                     >
-                        {(params.row.status==undefined || params.row.status==0) && <MenuItem key={'delete'} onClick={() => {
-                            deleteReport(params.row.id)
-                            .then(ok=> {
-                                if(ok) {
-                                    const newReports = [...reports || []].filter(x=>x.id!=params.row.id)
-                                    onReports(newReports)
-                                }
-                                handleClose()
-                            }).catch(()=> {
-                                handleClose()
-                            })
-                        }}>
-                            Delete
-                        </MenuItem>}
-                        <MenuItem key={'view'} onClick={() => {
-                            onReportClicked(params.row)
-                            handleClose()
-                        }}>
-                            View
-                        </MenuItem>
-
-                    </Menu>
-                </div>)
+                        View
+                    </Button>
+                    {canDeleteReport(report) && <Button
+                        size="small"
+                        color="error"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            deleteReport(report.id)
+                                .then(ok=> {
+                                    if(ok) {
+                                        const newReports = [...reports || []].filter(x=>x.id!=report.id)
+                                        onReports(newReports)
+                                    }
+                                }).catch(console.log)
+                        }}
+                    >
+                        Delete
+                    </Button>}
+                </Stack>)
             }
-        }
-        ,
+        },
         {
-            field: 'status', headerName: 'Status', width: 140,
+            field: 'status',
+            headerName: 'Status',
+            width: 160,
             valueGetter: (value: any) => {
                 return statuses && statuses.get(value)?.text || "Not yet submitted"
             },
         },
-        { field: 'reqnumber', headerName: '311#', width: 140 },
-        { field: 'license', headerName: 'License #', 
+        { field: 'reqnumber', headerName: '311 #', width: 150 },
+        {
+            field: 'license',
+            headerName: 'Plate',
             valueGetter: (_: any, row: any) => {
-                return `${row.license}:${row.state}`
+                return `${row.license || ''}${row.state ? `:${row.state}` : ''}`
             },
-            width: 150 },
-        { field: 'loc1_address', headerName: 'Address', width: 350 },
+            width: 140
+        },
+        { field: 'typeofcomplaint', headerName: 'Complaint', width: 180 },
+        { field: 'loc1_address', headerName: 'Address', flex: 1, minWidth: 260 },
         {
             field: 'timeofreport',
             headerName: 'Date',
-            valueGetter: (value: any) => {
-                return formatCustomDate(value, true)
-            },
-            width: 400,
+            valueGetter: (value: any) => value ? new Date(value) : null,
+            valueFormatter: (value: any) => value ? formatCustomDate(value, true) : '',
+            width: 210,
         },
         {
-            field: 'files', headerName: 'Photos', width: 100,
-            valueGetter: (value: any) => value.length
+            field: 'files',
+            headerName: 'Files',
+            width: 90,
+            valueGetter: (value: any) => value?.length || 0
 
         }
     ];
 
     return (
-        <Paper sx={{ height: "70%", width: '100%' }}>
+        <Paper sx={{ height: "100%", width: '100%', overflow: "hidden" }}>
             <DataGrid
-                // onCellClick={(cell) => {
-                //     onReportClicked(cell.row as SimpleReport)
-                // }}
                 rows={reports || []}
                 columns={columns}
-                initialState={{ pagination: { paginationModel } }}
-                checkboxSelection
-                sx={{ border: 0 }}
+                initialState={{
+                    pagination: { paginationModel },
+                    sorting: { sortModel: [{ field: 'timeofreport', sort: 'desc' }] },
+                }}
+                pageSizeOptions={[10, 25, 50, 100]}
+                disableRowSelectionOnClick
+                onRowDoubleClick={(params) => onReportClicked(params.row as SimpleReport)}
+                sx={{
+                    border: 0,
+                    '& .MuiDataGrid-columnHeaders': {
+                        bgcolor: '#f8fafc',
+                    },
+                    '& .MuiDataGrid-row:hover': {
+                        cursor: 'pointer',
+                    },
+                }}
             />
         </Paper>
     );

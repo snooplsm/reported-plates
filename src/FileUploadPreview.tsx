@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import heic2any from "heic2any";
 
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import { isHeicFile, isVideoReportFile } from './api/file-utils';
 
 interface FileProps {
   id: string,
@@ -20,7 +21,7 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
   useEffect(() => {
     let cancelled = false;
     let localUrl: string | null = null;
-    const isHeic = file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic");
+    const isHeic = isHeicFile(file);
 
     setImageSrc(null);
     setPreviewText("Processing preview...");
@@ -106,7 +107,7 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
     )
   }
 
-  const isVideo = file.type.indexOf('video')!=-1
+  const isVideo = isVideoReportFile(file)
   return (
     <Box
     sx={{

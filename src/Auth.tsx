@@ -5,6 +5,7 @@ import { ComplaintType } from './Complaints';
 import { Feature } from './api/ny/nyc/nyc';
 import { Subject } from 'rxjs';
 import { CustomJwtPayload } from './LoginModal';
+import { isImageReportFile, isVideoReportFile, MAX_REPORT_IMAGES, MAX_REPORT_VIDEOS } from './api/file-utils';
 
 const PARSE_APPLICATION_ID = import.meta.env.VITE_PARSE_APPLICATION_ID
 const PARSE_HOST_URL = import.meta.env.VITE_PARSE_HOST_URL
@@ -30,6 +31,14 @@ export const loginWithPassword = async (email: string, password: string, accessT
     } catch (e) {
         throw e
     }
+}
+
+export const loginWithEmailPassword = async (email: string, password: string): Promise<User> => {
+    const user = await Parse.User.logIn(email, password)
+    localStorage.removeItem('user')
+    const loggedInUser = toUser(user)
+    userLogin.next(loggedInUser)
+    return loggedInUser
 }
 
 export interface ReportError {
@@ -113,6 +122,10 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     s.set('latitude1', r.address.geometry.coordinates[1])
     s.set('latitude', r.address.geometry.coordinates[1].toString())
     s.set('longitude', r.address.geometry.coordinates[0].toString())
+    s.set('location', new Parse.GeoPoint({
+        latitude: r.address.geometry.coordinates[1],
+        longitude: r.address.geometry.coordinates[0]
+    }))
     s.set('can_be_shared_publicly', true)
     s.set('typeofreport', 'complaint')
     s.set('colorTaxi', r.colorTaxi || undefined)
@@ -131,14 +144,16 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     }
     let index = 0
     let videoIndex = 0
-    if (r.files.length > 2) {
-        throw Error("Too Many Files")
+    const imageCount = r.files.filter(isImageReportFile).length
+    const videoCount = r.files.filter(isVideoReportFile).length
+    if (imageCount > MAX_REPORT_IMAGES || videoCount > MAX_REPORT_VIDEOS || (imageCount > 0 && videoCount > 0)) {
+        throw Error("Attach up to 3 photos or 1 video.")
     }
 
     for (const file of r.files) {
         const f = new Parse.File(file.name, file);
         const photo = await f.save()
-        if(file.type.indexOf('image')!=-1) {
+        if(isImageReportFile(file)) {
             s.set(`photoData${index}`, photo)
             index++
         } else {
@@ -157,7 +172,10 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
         status: 0,
         reqnumber: s.get('reqnumber') || '',
         typeofcomplaint: s.get("typeofcomplaint"),
-        files: [s.get('photoData0'), s.get('photoData1'), s.get('photoData2')].filter(x=>x!=null).map(x=>x.url())
+        files: [s.get('photoData0'), s.get('photoData1'), s.get('photoData2')].filter(x=>x!=null).map(x=>x.url()),
+        loc1_address: s.get('loc1_address'),
+        location: [r.address.geometry.coordinates[1], r.address.geometry.coordinates[0]],
+        reportDescription: s.get('reportDescription')
     } as SimpleReport
 }
 
@@ -213,24 +231,37 @@ export interface SimpleReport {
     typeofcomplaint: ComplaintType
     files: string[]
     loc1_address: string
-    location: number[],
+    location?: number[],
     reportDescription: string
 }
 
 const transformSubmission = (p: Parse.Object): SimpleReport => {
     const loc = p.get('location')
+    const latitude = loc?.latitude ?? Number(p.get('latitude1') ?? p.get('latitude'))
+    const longitude = loc?.longitude ?? Number(p.get('longitude1') ?? p.get('longitude'))
+    const location = Number.isFinite(latitude) && Number.isFinite(longitude)
+        ? [latitude, longitude]
+        : undefined
+    const status = p.get('Status') ?? p.get('status') ?? 0
+
     return {
         id: p.id,
         license: p.get('license'),
         state: p.get('state'),
-        timeofreport: p.get('timeofreport'),
+        timeofreport: p.get('timeofreport') || p.get('timeofreported') || p.get('timeofincident'),
         typeofcomplaint: p.get("typeofcomplaint"),
         loc1_address: p.get('loc1_address'),
         reqnumber: p.get("reqnumber") || '',
-        location: [loc.latitude, loc.longitude],
+        location,
         reportDescription: p.get("reportDescription"),
-        status: p.get('status'),
-        files: [p.get('photoData0'), p.get('photoData1'), p.get('PhotoData3')].filter(x => x != null).map(x => x.url())
+        status,
+        files: [
+            p.get('photoData0'),
+            p.get('photoData1'),
+            p.get('photoData2'),
+            p.get('videoData0'),
+            p.get('videoData1')
+        ].filter(x => x != null).map(x => x.url())
     } as SimpleReport
 }
 
@@ -243,7 +274,10 @@ export interface Status {
 export const getStatuses = async (): Promise<Map<Number, Status> | undefined> => {
     const statuses = localStorage.getItem('statuses')
     if (statuses) {
-        return JSON.parse(statuses) as Map<number, Status>
+        const parsed = JSON.parse(statuses)
+        if (Array.isArray(parsed)) {
+            return new Map(parsed) as Map<number, Status>
+        }
     }
     const Submission = Parse.Object.extend("Statuses");
     const query = new Parse.Query(Submission)
@@ -258,12 +292,20 @@ export const getStatuses = async (): Promise<Map<Number, Status> | undefined> =>
             } as Status
             return [status.id, status]
         }))
-        localStorage.setItem('statuses', JSON.stringify(map))
+        localStorage.setItem('statuses', JSON.stringify(Array.from(map.entries())))
         return map
     } catch (error) {
 
     }
 
+}
+
+const reqNumberSearchTerm = (reqNumber: string) => {
+    const trimmed = reqNumber.trim()
+    if (!trimmed) {
+        return ''
+    }
+    return trimmed.split('-').filter(Boolean).pop()?.trim() || trimmed
 }
 
 // Example usage
@@ -273,24 +315,22 @@ export const querySubmissions = async ({ startDate, endDate, reqNumber, license 
     const currentUser = Parse.User.current();
     query.equalTo("user", currentUser);
 
-    // Date range filter for `timeofincident`
-    if (startDate && endDate) {
-        query.greaterThanOrEqualTo("timeofincident", startDate);
-        query.lessThanOrEqualTo("timeofincident", endDate);
-    } else if (startDate) {
-        //   query.greaterThanOrEqualTo("timeofincident", startDate);
+    if (startDate) {
+        query.greaterThanOrEqualTo("timeofreport", startDate);
+    }
+    if (endDate) {
+        query.lessThanOrEqualTo("timeofreport", endDate);
     }
 
-    // Partial match for `reqnumber`
-    if (reqNumber) {
-        query.matches("reqnumber", reqNumber, "i"); // Case-insensitive regex match
+    const normalizedReqNumber = reqNumberSearchTerm(reqNumber)
+    if (normalizedReqNumber) {
+        query.matches("reqnumber", normalizedReqNumber, "i");
     }
-
-    // Partial match for `license`
     if (license) {
-        query.matches("license", license, "i"); // Case-insensitive regex match
+        query.matches("license", license.trim(), "i");
     }
-    query.ascending("timeofincident");
+    query.descending("timeofreport");
+    query.limit(1000);
     try {
         console.log(query)
         const results = await query.find();

@@ -30,7 +30,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
 
 
   useEffect(() => {
-    setPlateText(plate?.text || "NONE")
+    setPlateText(plate?.plateOverride || plate?.text || "")
     if(plate) {
       onPlateChange(plate)
     }
@@ -91,20 +91,20 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
       >
         <TextField
           variant="standard" // Remove outlined or filled styling
-          placeholder="NONE"
+          placeholder="PLATE"
           InputProps={{
             disableUnderline: true, // Disable underline
             sx: {
-              fontSize: { xs: "2rem", sm: "2.2rem", md: "clamp(1.9rem, 6vw, 2.5rem)" },
+              fontSize: { xs: "4rem", sm: "2.2rem", md: "clamp(1.9rem, 6vw, 2.5rem)" },
               fontWeight: 600,  // Remove padding
               textAlign: "center",
               width: "100%",
               overflow: "visible",
               lineHeight: 1,
-              letterSpacing: { xs: "0.05em", sm: "0.06em", md: "0.08em" },
+              letterSpacing: { xs: "0.02em", sm: "0.06em", md: "0.08em" },
               padding: 0,
               "&::placeholder": {
-                fontSize: { xs: "1.6rem", sm: "1.8rem", md: "2rem" },
+                fontSize: { xs: "3.2rem", sm: "1.8rem", md: "2rem" },
                 opacity: 0.85,
               }
             }

@@ -28,6 +28,14 @@ Thank you for helping to make our streets safer by holding reckless drivers acco
    npm run dev
    ```
 
+   Vite is configured to listen on your network as well as your local machine.
+   Use the `Network` URL printed by Vite, such as `http://192.168.1.10:5173/`,
+   from another device on the same Wi-Fi network.
+
+   On Android Chrome, choose photos through the file/document picker when you
+   need GPS EXIF. The app's upload control is configured for that path because
+   Android's media photo picker may redact photo location metadata.
+
 ---
 
 ## TODO

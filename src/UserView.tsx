@@ -1,9 +1,9 @@
-import { GoogleLogin, useGoogleOneTapLogin } from "@react-oauth/google"
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { BasicSpeedDial } from "./BasicSpeedDial"
 import { Box, Button } from "@mui/material"
 import { useNavigate } from "react-router-dom"
-import { closeSnackbar, enqueueSnackbar } from "notistack"
+import { enqueueSnackbar } from "notistack"
+import LoginModal from "./LoginModal"
 
 export interface UserProps {
     isSignedIn: boolean
@@ -18,15 +18,9 @@ export interface UserViewRef {
 export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handleSuccess, handleError }, ref) => {
 
     const [avatar, setAvatar] = useState<string>('')  
+    const [loginOpen, setLoginOpen] = useState(false)
 
     const nav = useNavigate()
-
-    const login = () => {
-        useGoogleOneTapLogin({
-            onSuccess: handleSuccess,  
-              
-        })
-    }
 
     useImperativeHandle(ref, () => ({
         refreshUserAvatar: () => {
@@ -42,7 +36,9 @@ export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handle
             const userS = localStorage.getItem('user')
             if (userS) {
                 const user = JSON.parse(userS)
-                setAvatar(user.picture)
+                setAvatar(user.picture || '')
+            } else {
+                setAvatar('')
             }
         }
     }, [isSignedIn])
@@ -75,12 +71,37 @@ export const UserView = forwardRef<UserViewRef, UserProps>(({ isSignedIn, handle
             onClick={() => nav('/')}
         />
         <Box>
-            {!isSignedIn && <Box component={"div"} id="googlelogin"><GoogleLogin
-                shape="pill"
-                onSuccess={handleSuccess}
-                onError={handleError}
-            /></Box>}
+            {!isSignedIn && <Button
+                id="login"
+                variant="contained"
+                onClick={() => setLoginOpen(true)}
+                sx={{
+                    borderRadius: "999px",
+                    textTransform: "none",
+                    fontWeight: 700,
+                    px: 2.5,
+                    minHeight: 44,
+                    whiteSpace: "nowrap"
+                }}
+            >
+                Log In
+            </Button>}
             {isSignedIn && <BasicSpeedDial avatarUrl={avatar} />}
         </Box>
+        <LoginModal
+            open={loginOpen}
+            onClose={() => setLoginOpen(false)}
+            onLoggedIn={() => setLoginOpen(false)}
+            onGoogleSuccess={(credential) => {
+                setLoginOpen(false)
+                handleSuccess(credential)
+            }}
+            onGoogleError={handleError}
+            onAppleSignIn={() => {
+                enqueueSnackbar('Apple Sign in is not configured yet.', {
+                    variant: 'info',
+                })
+            }}
+        />
     </Box>)
 }) 

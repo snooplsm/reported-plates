@@ -1,15 +1,22 @@
-import { Box, Button, Card, CardActions, CardContent, CardHeader, CardMedia, Modal, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardActions, CardContent, CardHeader, Modal, TextField, Typography } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
-import { Report, submitReport } from "./Auth";
+import { Report, SimpleReport, submitReport } from "./Auth";
 import { useEffect, useState } from "react";
 import moment from "moment";
 import heic2any from "heic2any";
+import { isHeicFile, isImageReportFile, isVideoReportFile } from "./api/file-utils";
 
 export interface SubmissionProps {
     report: Report
     onCancel?: () => void
-    onComplete?: (report:Report)=> void
+    onComplete?: (report:SimpleReport)=> void
     open: boolean
+}
+
+type PreviewMedia = {
+    url: string
+    type: "image" | "video"
+    key: string
 }
 
 export function formatCustomDate(date:Date, showAgo = true) {
@@ -35,13 +42,14 @@ export function formatCustomDate(date:Date, showAgo = true) {
 
 export const SubmissionPreview = ({ report, onCancel, onComplete, open }: SubmissionProps) => {
 
-    const [images, setImages] = useState<string[]>([])
+    const [media, setMedia] = useState<PreviewMedia[]>([])
 
     const [phone, setPhone] = useState('')
 
     const [phoneError, setPhoneError] = useState(false)
 
     const [submitting, setSubmitting] = useState(false)
+    const [submitError, setSubmitError] = useState("")
 
     function formatPhoneNumber(phone: string): string {
         // Remove all non-numeric characters
@@ -65,44 +73,80 @@ export const SubmissionPreview = ({ report, onCancel, onComplete, open }: Submis
     
 
     useEffect(() => {
-        const code = async () => {
-            const oldFiles = images
-            for (const file of oldFiles || []) {
-                URL.revokeObjectURL(file)
-            }
-            const imgs = await Promise.all(
-                report.files.map(async (file) => {
-                    if (file.type.toLowerCase() === "image/heic") {
-                        const uuu = URL.createObjectURL(file);
-                        try {
-                            const blob: Blob = await (await fetch(uuu)).blob();
-                            const converted = await heic2any({
-                                blob,
-                                toType: "image/jpeg",
-                            }) as Blob;
-                            return URL.createObjectURL(converted);
-                        } catch (e) {
-                            console.log(e);
-                            return null;
-                        }
-                    } else {
-                        return URL.createObjectURL(file);
-                    }
-                })) || []
-            const imagesFiltered = imgs.filter(k => k != undefined && k != null)
-            setImages(imagesFiltered)
-        }
-        code()
+        let cancelled = false
+        let urlsToRevoke: string[] = []
 
+        const loadPreviewMedia = async () => {
+            const video = report.files.find(isVideoReportFile)
+            const files = video
+                ? [video]
+                : report.files.filter(isImageReportFile).slice(0, 3)
+
+            const loaded = await Promise.all(files.map(async (file, index): Promise<PreviewMedia | undefined> => {
+                try {
+                    if (isVideoReportFile(file)) {
+                        return {
+                            url: URL.createObjectURL(file),
+                            type: "video",
+                            key: `${file.name}_${file.lastModified}_${index}`,
+                        }
+                    }
+
+                    if (isHeicFile(file)) {
+                        const converted = await heic2any({
+                            blob: file,
+                            toType: "image/jpeg",
+                        }) as Blob;
+                        return {
+                            url: URL.createObjectURL(converted),
+                            type: "image",
+                            key: `${file.name}_${file.lastModified}_${index}`,
+                        }
+                    }
+
+                    return {
+                        url: URL.createObjectURL(file),
+                        type: "image",
+                        key: `${file.name}_${file.lastModified}_${index}`,
+                    }
+                } catch (e) {
+                    console.log(e);
+                    return undefined;
+                }
+            }))
+
+            const previewMedia = loaded.filter((item): item is PreviewMedia => item != undefined)
+            const urls = previewMedia.map(item => item.url)
+            if (cancelled) {
+                urls.forEach(url => URL.revokeObjectURL(url))
+                return
+            }
+
+            urlsToRevoke = urls
+            setMedia(previewMedia)
+        }
+
+        setMedia([])
+        void loadPreviewMedia()
+
+        return () => {
+            cancelled = true
+            urlsToRevoke.forEach(url => URL.revokeObjectURL(url))
+        }
     }, [report])
 
     return (<Modal open={open} onClose={onCancel} >
             <Card sx={{
-                position: "absolute",
+                position: "fixed",
                 top: "50%",
                 left: "50%",
-                maxWidth: "35%",
-                transform: "translate(-50%, -50%)", // Centers the moda
+                transform: "translate(-50%, -50%)",
+                width: { xs: "calc(100vw - 24px)", sm: 560, md: 640 },
+                maxWidth: "calc(100vw - 24px)",
+                maxHeight: { xs: "calc(100dvh - 24px)", sm: "calc(100dvh - 48px)" },
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
             }}>
                 <CardHeader
                     // avatar={
@@ -117,19 +161,67 @@ export const SubmissionPreview = ({ report, onCancel, onComplete, open }: Submis
                     // }
                     title={report.typeofcomplaint}
                     subheader={`${formatCustomDate(report.timeofreport,false)}`}
+                    sx={{
+                        flex: "0 0 auto",
+                        "& .MuiCardHeader-title": {
+                            fontSize: { xs: "1rem", sm: "1.1rem" },
+                            fontWeight: 700,
+                        },
+                        "& .MuiCardHeader-subheader": {
+                            fontSize: { xs: "0.78rem", sm: "0.85rem" },
+                        },
+                    }}
                 />
-                <Box sx={{
-                    display: "flex"
+                {media.length > 0 && <Box sx={{
+                    display: "grid",
+                    gridTemplateColumns: media.length === 1 ? "1fr" : `repeat(${media.length}, minmax(0, 1fr))`,
+                    gap: 0.75,
+                    px: 2,
+                    pb: 1,
+                    flex: "0 0 auto",
+                    maxHeight: { xs: "24dvh", sm: 210 },
+                    overflow: "hidden",
                 }}>
-                    {images.map((x) => {
-                        return <CardMedia sx={{
-                            objectFit: "cover",
-                            width: `${(1 / images.length) * 100}%`
-                        }} component="img" height="200" image={x} />
-                    }
-                    )}
-                </Box>
-                <CardContent>
+                    {media.map((item) => (
+                        item.type === "video"
+                            ? <Box
+                                key={item.key}
+                                component="video"
+                                src={item.url}
+                                controls
+                                sx={{
+                                    width: "100%",
+                                    height: { xs: "24dvh", sm: 210 },
+                                    display: "block",
+                                    objectFit: "contain",
+                                    bgcolor: "#000",
+                                    borderRadius: 1,
+                                }}
+                            />
+                            : <Box
+                                key={item.key}
+                                component="img"
+                                src={item.url}
+                                alt="Submission preview media"
+                                sx={{
+                                    width: "100%",
+                                    height: { xs: media.length === 1 ? "24dvh" : 118, sm: media.length === 1 ? 210 : 156 },
+                                    display: "block",
+                                    objectFit: "cover",
+                                    borderRadius: 1,
+                                    bgcolor: "#0f172a",
+                                }}
+                            />
+                    ))}
+                </Box>}
+                <CardContent sx={{
+                    overflowY: "auto",
+                    flex: "1 1 auto",
+                    minHeight: 0,
+                    px: { xs: 2, sm: 3 },
+                    py: { xs: 1.5, sm: 2 },
+                }}>
+                    {submitError && <Alert severity="error" sx={{ mb: 1.5 }}>{submitError}</Alert>}
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         License plate <b>{report.license}</b>:<b>{report.state}</b> {report.typeofcomplaint}
                         <b></b> on <i>{formatCustomDate(report.timeofreport)}</i> <b>{report.address.properties.label}</b>.<br /><br />
@@ -150,11 +242,10 @@ export const SubmissionPreview = ({ report, onCancel, onComplete, open }: Submis
                                 width: "100%"
                             }}
                             error={phoneError}
-                            focused
                             onChange={((e) => {
                                 const newPhone = formatPhoneNumber(e.currentTarget.value)
                                 setPhone(newPhone)
-                                setPhoneError(isValidPhoneNumber(newPhone))
+                                setPhoneError(newPhone.length > 0 && !isValidPhoneNumber(newPhone))
                             })}
                             value={phone}
                             // label="Phone"
@@ -163,7 +254,16 @@ export const SubmissionPreview = ({ report, onCancel, onComplete, open }: Submis
                     </Box>
                     }
                 </CardContent>
-                <CardActions>
+                <CardActions disableSpacing sx={{
+                    flex: "0 0 auto",
+                    gap: 1,
+                    px: { xs: 2, sm: 3 },
+                    py: 1.5,
+                    borderTop: "1px solid rgba(15, 23, 42, 0.1)",
+                    justifyContent: "flex-end",
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: "stretch",
+                }}>
                     <LoadingButton
                         onClick={()=> {
                             if(submitting) {
@@ -177,22 +277,30 @@ export const SubmissionPreview = ({ report, onCancel, onComplete, open }: Submis
                                 setPhoneError(false)
                             }
                             setSubmitting(true)
+                            setSubmitError("")
                             submitReport(report, phone)
-                            .then(()=> {
+                            .then((savedReport)=> {
                                 setSubmitting(false)
-                                onComplete?.(report)
-                            }).catch(()=> {
+                                onComplete?.(savedReport)
+                            }).catch((error)=> {
                                 setSubmitting(false)
+                                setSubmitError(error instanceof Error ? error.message : "Submission failed. Please try again.")
                             })
                         }}
                         loading={submitting}
                         disabled={submitting}
-                        loadingPosition="start">
+                        loadingPosition="start"
+                        variant="contained"
+                        sx={{
+                            width: { xs: "100%", sm: "auto" },
+                        }}>
                         Submit
                     </LoadingButton>
                     <Button onClick={() => {
                         onCancel?.()
-                    }} color="secondary">
+                    }} color="secondary" sx={{
+                        width: { xs: "100%", sm: "auto" },
+                    }}>
                         Cancel
                     </Button>
                 </CardActions>

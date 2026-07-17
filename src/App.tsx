@@ -1,14 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import * as ExifReader from 'exifreader';
-import { getFileHash } from './api/file-utils';
+import { getFileHash, isImageReportFile, isSupportedReportFile, isVideoReportFile, MAX_REPORT_IMAGES, MAX_REPORT_VIDEOS } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import type { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, ThemeProvider, Paper, LinearProgress, useMediaQuery, } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, LinearProgress, useMediaQuery, Avatar } from "@mui/material";
 import theme from './theme';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
-import { Complaint, ComplaintsView } from './Complaints';
+import { Complaint, complaints, ComplaintsView } from './Complaints';
 import { StepView } from './StepView';
 import { UserView, UserViewRef } from './UserView'
 import { DetectionView } from './DetectionView';
@@ -25,10 +25,61 @@ import { isLoggedIn, login, Report, ReportErrors, userLogin, userLogout, User } 
 import TextArea from './TextArea';
 import { SubmissionPreview } from './SubmissionPreview';
 import { classifyVehicle } from './classifyVehicle';
-import { SnackbarProvider, enqueueSnackbar, closeSnackbar } from 'notistack';
+import { SnackbarProvider, enqueueSnackbar } from 'notistack';
 import { LargeDragDropView } from './LargeDragDropView';
+import { clearReportDraft, loadReportDraft, saveReportDraft } from './reportDraft';
+import { DevQrCode } from './DevQrCode';
 
 const DetectView = lazy(() => import('./DetectView'))
+
+type ExifTag = {
+  description?: string
+  value?: unknown
+}
+
+const tagText = (tag?: ExifTag) => {
+  if (tag?.description != null) {
+    return String(tag.description)
+  }
+  if (tag?.value != null) {
+    return String(tag.value)
+  }
+  return ''
+}
+
+const parseExifCoordinate = (coordinateTag?: ExifTag, refTag?: ExifTag) => {
+  const coordinate = parseFloat(tagText(coordinateTag))
+  if (!Number.isFinite(coordinate) || coordinate === 0) {
+    return undefined
+  }
+
+  const ref = tagText(refTag).toLowerCase()
+  if (ref.includes('south') || ref === 's' || ref.includes('west') || ref === 'w') {
+    return -Math.abs(coordinate)
+  }
+  return coordinate
+}
+
+const parseExifDate = (tags: Record<string, ExifTag | undefined>) => {
+  const original = tagText(tags['DateTimeOriginal']).trim()
+  if (!original) return undefined
+  const offset = tagText(tags['OffsetTimeOriginal'] || tags['OffsetTime']).trim()
+  const normalized = original
+    .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+    .replace(' ', 'T')
+  const parsed = new Date(offset ? `${normalized}${offset}` : normalized)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+const isUsableLatLng = (latitude?: number, longitude?: number) => {
+  return latitude != null
+    && longitude != null
+    && Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+    && Math.abs(latitude) <= 90
+    && Math.abs(longitude) <= 180
+    && !(latitude === 0 && longitude === 0)
+}
 
 function App() {
   const isMobile = useMediaQuery('(max-width:900px)')
@@ -41,11 +92,12 @@ function App() {
 
   const [location, setLocation] = useState<GeoSearchResponse>()
 
-  const [latLng, setLatLng] = useState<Number[]>()
+  const [latLng, setLatLng] = useState<number[]>()
 
   const [hoveredStep, setHoveredStep] = useState<Steps | undefined>()
 
   const [showLoginModal, setShowLoginModal] = useState<[string, CustomJwtPayload]>()
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   const [isSignedIn, setIsSignedIn] = useState<User>()
 
@@ -60,12 +112,13 @@ function App() {
   const [heicProcessing, setHeicProcessing] = useState<Record<string, { text: string; progress: number }>>({})
 
   const [reportPreview, setReportPreview] = useState<Report>()
-
   const [showReportPreview, setShowReportPreview] = useState(false)
 
   const [reportError, setReportError] = useState<Set<ReportErrors>>()
 
   const userRef = useRef<UserViewRef | null>(null)
+  const geoFallbackAttemptedRef = useRef(false)
+  const continueVerifyAfterLoginRef = useRef(false)
 
   const clearState = () => {
     setFiles(new Set())
@@ -78,6 +131,12 @@ function App() {
     setComplaint(undefined)
     setLocation(undefined)
     setHeicProcessing({})
+    setPlate(undefined)
+    setResults(undefined)
+    setCar(undefined)
+    setReportDescription('')
+    geoFallbackAttemptedRef.current = false
+    void clearReportDraft().catch(console.log)
   }
 
   useEffect(() => {
@@ -118,6 +177,66 @@ function App() {
   const [car, setCar] = useState<DetectBox>()
 
   const [reportDescription, setReportDescription] = useState<string>('')
+  const [draftReady, setDraftReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    loadReportDraft()
+      .then((draft) => {
+        if (cancelled || !draft) return
+        const restoredFiles = (draft.files || []).filter(isSupportedReportFile)
+        setFiles(new Set(restoredFiles))
+        setFileNames(new Set(restoredFiles.map(file => file.name)))
+        if (restoredFiles.length > 0) setCurrentFile(0)
+        setComplaint(complaints.find(item => item.type === draft.complaintType))
+        setLocation(draft.location)
+        setLatLng(draft.latLng)
+        setDateOfIncident(draft.dateOfIncident ? new Date(draft.dateOfIncident) : undefined)
+        setPlate(draft.plate as PlateDetection | undefined)
+        setReportDescription(draft.reportDescription || '')
+      })
+      .catch(console.log)
+      .finally(() => {
+        if (!cancelled) setDraftReady(true)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady) return
+    const persistDraft = () => {
+      const hasDraft = files.size > 0 || complaint || location || dateOfIncident || plate || reportDescription.trim()
+      if (!hasDraft) {
+        void clearReportDraft().catch(console.log)
+        return
+      }
+      void saveReportDraft({
+        files: [...files],
+        complaintType: complaint?.type,
+        location,
+        latLng,
+        dateOfIncident: dateOfIncident?.toISOString(),
+        plate: plate ? {
+          text: plate.text,
+          state: plate.state,
+          plateOverride: plate.plateOverride,
+          tlc: plate.tlc,
+        } : undefined,
+        reportDescription,
+      }).catch(console.log)
+    }
+    const persistWhenHidden = () => {
+      if (document.visibilityState === "hidden") persistDraft()
+    }
+    const timer = window.setTimeout(persistDraft, 350)
+    document.addEventListener("visibilitychange", persistWhenHidden)
+    window.addEventListener("pagehide", persistDraft)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener("visibilitychange", persistWhenHidden)
+      window.removeEventListener("pagehide", persistDraft)
+    }
+  }, [complaint, dateOfIncident, draftReady, files, latLng, location, plate, reportDescription])
 
   const [showDragView, setShowDragView] = useState(false)
   const dragDepthRef = useRef(0)
@@ -245,13 +364,32 @@ function App() {
     signedIn()
   }, [])
 
+  const showReportPreviewForUser = (user?: User) => {
+    const report = getReport(user)
+    setReportPreview(report)
+    setShowReportPreview(report != undefined)
+  }
+
+  const handleCompletedAuth = (user: User) => {
+    setIsSignedIn(user)
+    setShowAuthModal(false)
+    setShowLoginModal(undefined)
+    if (continueVerifyAfterLoginRef.current) {
+      continueVerifyAfterLoginRef.current = false
+      showReportPreviewForUser(user)
+    }
+  }
+
   const handleSuccess = (credentialResponse: any) => {
     // Handle the successful login here
-    login(credentialResponse, (accessToken: string, jwt: CustomJwtPayload) => {
+    setShowAuthModal(false)
+    return login(credentialResponse, (accessToken: string, jwt: CustomJwtPayload) => {
       setShowLoginModal([accessToken, jwt])
     })
-      .then(() => {
-
+      .then((user) => {
+        if (user) {
+          handleCompletedAuth(user)
+        }
       }).catch(e => {
         console.log(e)
       })
@@ -298,7 +436,7 @@ function App() {
     return warmupPromiseRef.current
   }, [modelsReady])
 
-  const getReport = () => {
+  const getReport = (signedInUser = isSignedIn) => {
     const err: Set<ReportErrors> = new Set()
     let license: string | undefined
     let state: string | undefined
@@ -344,7 +482,7 @@ function App() {
       err.add(ReportErrors.MISSING_COMPLAINT)
     }
 
-    const user = isSignedIn
+    const user = signedInUser
     if (user == undefined) {
       err.add(ReportErrors.NOT_LOGGED_IN)
       if (userRef.current) {
@@ -379,66 +517,120 @@ function App() {
     return report
   }
 
+  const handleVerifySubmit = () => {
+    if (!isSignedIn) {
+      continueVerifyAfterLoginRef.current = true
+      setShowAuthModal(true)
+      return
+    }
+    showReportPreviewForUser()
+  }
+
   const onFiles = async (complaint?: Complaint, filez?: File[]) => {
     setShowDragView(false)
-    if (filez && filez.length > 0) {
+    const incomingFiles = (filez || []).filter(isSupportedReportFile)
+    const skippedFiles = (filez || []).length - incomingFiles.length
+    if (skippedFiles > 0) {
+      enqueueSnackbar(`Skipped ${skippedFiles} unsupported file${skippedFiles === 1 ? '' : 's'}. Please choose JPEG, HEIC, WebP, or video.`, {
+        variant: "warning",
+        autoHideDuration: 6000
+      })
+    }
+    if (incomingFiles.length > 0) {
       const newFiles = new Set<File>(files)
-      filez.forEach(file => {
-        if (!fileNames.has(file.name)) {
-          newFiles.add(file)
+      const newFileNames = new Set(fileNames)
+      let rejectedForLimit = 0
+      incomingFiles.forEach(file => {
+        if (newFileNames.has(file.name)) return
+        const existing = [...newFiles]
+        const imageCount = existing.filter(isImageReportFile).length
+        const videoCount = existing.filter(isVideoReportFile).length
+        const canAdd = isVideoReportFile(file)
+          ? imageCount === 0 && videoCount < MAX_REPORT_VIDEOS
+          : videoCount === 0 && imageCount < MAX_REPORT_IMAGES
+        if (!canAdd) {
+          rejectedForLimit += 1
+          return
         }
+        newFiles.add(file)
+        newFileNames.add(file.name)
       })
       setFiles(newFiles)
+      setFileNames(newFileNames)
       if (currentFile == undefined) {
         setCurrentFile(0)
+      }
+      if (rejectedForLimit > 0) {
+        enqueueSnackbar("Attach up to 3 photos or 1 video. Extra media was not added.", {
+          variant: "warning",
+          autoHideDuration: 4000,
+        })
       }
     }
     if (complaint) {
       setComplaint(complaint)
     }
 
-    const exifGetter = async (file: File) => {
-      if(file.type.indexOf('image/')==-1) {
-        return
-      }
-      const hash = await getFileHash(file)
-      console.log("hash", hash)
-      const tags = await ExifReader.load(file);
-      console.log(tags)
-      const unprocessedTagValue = tags['DateTimeOriginal']?.value;
-      const offsetTime = tags['OffsetTime']?.value
-      if (offsetTime && unprocessedTagValue) {
-        const dateWithZone = `${unprocessedTagValue}${offsetTime}`.replace(/^(\d{4}):(\d{2}):/, '$1-$2-').replace(' ', 'T');
-        const dateTime = new Date(dateWithZone)
-        setDateOfIncident(dateTime)
-      } else if (unprocessedTagValue) {
-
-      }
-      const latitude =
-        tags['GPSLatitudeRef']?.description?.toLowerCase() === 'south latitude'
-          ? -Math.abs(parseFloat(tags['GPSLatitude']?.description || '0'))
-          : parseFloat(tags['GPSLatitude']?.description || '0');
-
-      const longitude =
-        tags['GPSLongitudeRef']?.description?.toLowerCase() === 'west longitude'
-          ? -Math.abs(parseFloat(tags['GPSLongitude']?.description || '0'))
-          : parseFloat(tags['GPSLongitude']?.description || '0');
-
-      console.log(unprocessedTagValue, latitude, longitude)
+    const applyGeoData = async (latitude: number, longitude: number, hash: string) => {
       const cachedGeo = reported.get<GeoSearchResponse>(ReportedKeys.Geo, hash)
       const data = cachedGeo ? cachedGeo : await fetchGeoData(latitude, longitude);
       if (data && data?.features?.[0]?.properties?.label?.length > 0) {
         reported.set(ReportedKeys.Geo, data, hash)
         setLocation(data)
-        // setFeature(data.features[0])
         setLatLng([latitude, longitude])
       }
+    }
+
+    const requestDeviceLocationFallback = async (hash: string) => {
+      if (geoFallbackAttemptedRef.current || latLng || location) {
+        return
+      }
+      geoFallbackAttemptedRef.current = true
+
+      if (!("geolocation" in navigator)) {
+        return
+      }
+
+      if (!window.isSecureContext) {
+        return
+      }
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 60_000,
+            timeout: 12_000,
+          })
+        })
+        await applyGeoData(position.coords.latitude, position.coords.longitude, `device_${hash}`)
+      } catch (error) {
+        console.log(error)
+      }
+    }
+
+    const exifGetter = async (file: File) => {
+      if(!isImageReportFile(file)) {
+        return
+      }
+      const hash = await getFileHash(file)
+      const tags = await ExifReader.load(file) as Record<string, ExifTag | undefined>;
+      const photoDate = parseExifDate(tags)
+      if (photoDate) setDateOfIncident(current => current || photoDate)
+      const latitude = parseExifCoordinate(tags['GPSLatitude'], tags['GPSLatitudeRef'])
+      const longitude = parseExifCoordinate(tags['GPSLongitude'], tags['GPSLongitudeRef'])
+
+      if (!isUsableLatLng(latitude, longitude)) {
+        await requestDeviceLocationFallback(hash)
+        return
+      }
+      await applyGeoData(latitude, longitude, hash)
     }
 
     // Let the UI paint first (hide drag overlay, update previews) before expensive work starts.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const processFiles = async () => {
-        const imageFiles = (filez || []).filter((file) => file.type.indexOf('image/') !== -1)
+        const imageFiles = incomingFiles.filter(isImageReportFile)
         for (const file of imageFiles) {
           void exifGetter(file).catch(console.log)
         }
@@ -486,6 +678,7 @@ function App() {
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <DevQrCode />
       {(isModelLoading || isHeicProcessing) && <Paper sx={{
         position: "fixed",
         zIndex: 1400,
@@ -495,6 +688,7 @@ function App() {
         borderRadius: 0,
         padding: 0,
         background: "transparent",
+        border: 0,
         boxShadow: "none"
       }}>
         <LinearProgress variant="determinate" value={topBarValue} sx={{ height: 3 }} />
@@ -506,10 +700,13 @@ function App() {
         sx={{
           width: "100%",
           maxWidth: "100vw",
-          gap: 1,
-          px: { xs: 1, md: 1 },
-          py: { xs: 2, md: 0 },
+          boxSizing: "border-box",
+          gap: { xs: 1.25, md: 1.5 },
+          px: { xs: 1, md: 1.5 },
+          py: { xs: 1.25, md: 1.5 },
           overflowX: "hidden",
+          alignItems: { xs: "stretch", md: "stretch" },
+          background: "linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%)",
         }}
         height={{ xs: "auto", md: "100vh" }}
       >
@@ -523,15 +720,28 @@ function App() {
           sx={{
             ml: { xs: 0, md: 0.5 },
             pt: { xs: 0, md: 2.5 },
+            pb: { xs: 0, md: 2.5 },
+            height: { xs: "auto", md: "100%" },
+            boxSizing: "border-box",
+            minHeight: { xs: "auto", md: 0 },
+            overflowY: { xs: "visible", md: "auto" },
+            scrollbarWidth: "thin",
+            scrollbarColor: "#aeb8c5 transparent",
             "& > *": {
-              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
+              marginTop: { xs: 1.25, md: 1.25 }, // Apply margin to all children
             },
             "& > *:first-of-type": {
-              marginTop: { xs: 2, md: 0 },
+              marginTop: { xs: 0, md: 0 },
             },
             "& > *:nth-of-type(2)": {
-              marginTop: { xs: 3, md: 3 },
+              marginTop: { xs: 1.5, md: 1.5 },
             },
+            "& > .fill-remaining": {
+              flex: { xs: "0 0 auto", md: "1 1 0" },
+              minHeight: { xs: "auto", md: 0 },
+              display: { xs: "block", md: "flex" },
+              flexDirection: { xs: "column", md: "column" },
+            }
           }}
         >
           <Paper sx={{ width: "100%", p: 1 }}>
@@ -565,7 +775,7 @@ function App() {
                 height: "auto",
 
                 padding: .5,
-                width: "100%", overflow: "display",
+                width: "100%", overflow: "visible",
               }}>
               {[...(files || [])].map((x, index) => {
                 const id = `${x.name}_${x.lastModified}_${x.size}`
@@ -593,7 +803,7 @@ function App() {
               })}
             </Box>
           </Paper>}
-          {!isMobile && <Paper sx={{
+          {!isMobile && <Paper className="fill-remaining" sx={{
             width: "100%",
             marginTop: 3,
             overflow: "visible"
@@ -601,7 +811,8 @@ function App() {
             <Box sx={{
               position: "relative",
               padding: 2,
-              paddingTop: 3
+              paddingTop: 3,
+              flex: 1,
             }}>
               <Box sx={{
                 // marginLeft: 2
@@ -618,77 +829,82 @@ function App() {
             </Box>
           </Paper>}
 
-          {!isMobile && <Paper sx={{
-            overflow: "display",
-            marginTop: 3,
-            position: "relative",
-            width: "100%",
-          }}>
-
-              <Button
-              onClick={async () => {
-
-                const report = getReport()
-  
-                setReportPreview(report)
-                setShowReportPreview(true)
-              }}
-              variant="text"
-              sx={{
-                
-                width: "100%",
-                height: "100%",
-                padding: 2
-              }}>
-              VERIFY & SUBMIT
-              </Button>
-            <StepView hasError={undefined}>6</StepView>
-          </Paper>}
         </Box>
         {/* Right Column */}
         <Box
           flex={{ xs: "1 1 auto", md: "0 0 50%" }}
           width={{ xs: "100%", md: "auto" }}
           display="flex"
+          flexDirection="column"
           sx={{
             mr: { xs: 0, md: 1 },
             pt: { xs: 0, md: 2.5 },
+            pb: { xs: 0, md: 2.5 },
+            height: { xs: "auto", md: "100%" },
+            boxSizing: "border-box",
+            minHeight: { xs: "auto", md: 0 },
+            overflowY: { xs: "visible", md: "auto" },
+            scrollbarWidth: "thin",
+            scrollbarColor: "#aeb8c5 transparent",
             "& > *": {
-              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
+              marginTop: { xs: 1.25, md: 1.25 }, // Apply margin to all children
             },
             "& > *:first-of-type": {
-              marginTop: { xs: 2, md: 0 },
-            }
+              marginTop: { xs: 0, md: 0 },
+            },
+            "& > .fill-remaining": {
+              flex: { xs: "0 0 auto", md: "1 1 0" },
+              minHeight: { xs: "auto", md: 0 },
+              display: { xs: "block", md: "flex" },
+              flexDirection: { xs: "column", md: "column" },
+            },
           }}
         >
-          {(currentFile == undefined) &&
-            <HowToGuide onStepHovered={(step) => {
-              setHoveredStep(step)
-            }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
-          {currentFile != undefined && currentFile >= 0 &&
-            <Suspense fallback={<Paper sx={{ p: 2 }}><LinearProgress /></Paper>}>
-              <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
-                setResults(result)
-                // setBoxes(result)
-                setCar(car)
-                setPlate(car.plate!)
-              }} onPlate={(manualPlate) => {
-                setPlate(manualPlate)
-              }} />
-            </Suspense>
-          }
+          <Box className="fill-remaining">
+            {(currentFile == undefined) &&
+              <HowToGuide onStepHovered={(step) => {
+                setHoveredStep(step)
+              }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
+            {currentFile != undefined && currentFile >= 0 &&
+              <Suspense fallback={<Paper sx={{ p: 2 }}><LinearProgress /></Paper>}>
+                <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
+                  setResults(result)
+                  // setBoxes(result)
+                  setCar(car)
+                  setPlate(car.plate!)
+                }} onPlate={(manualPlate) => {
+                  setPlate(manualPlate)
+                }} />
+              </Suspense>
+            }
+          </Box>
         </Box>
         <Box
           flex={{ xs: "1 1 auto", md: "1" }}
           width={{ xs: "100%", md: "auto" }}
+          display="flex"
+          flexDirection="column"
           sx={{
             pt: { xs: 0, md: 2.5 },
+            pb: { xs: 0, md: 2.5 },
+            height: { xs: "auto", md: "100%" },
+            boxSizing: "border-box",
+            minHeight: { xs: "auto", md: 0 },
+            overflowY: { xs: "visible", md: "auto" },
+            scrollbarWidth: "thin",
+            scrollbarColor: "#aeb8c5 transparent",
             "& > *": {
-              marginTop: { xs: 2, md: 1 }, // Apply margin to all children
+              marginTop: { xs: 1.25, md: 1.25 }, // Apply margin to all children
             },
             "& > *:first-of-type": {
-              marginTop: { xs: 2, md: 0 },
-            }
+              marginTop: { xs: 0, md: 0 },
+            },
+            "& > .fill-remaining": {
+              flex: { xs: "0 0 auto", md: "1 1 0" },
+              minHeight: { xs: "auto", md: 0 },
+              display: { xs: "block", md: "flex" },
+              flexDirection: { xs: "column", md: "column" },
+            },
           }
           }
         >
@@ -712,7 +928,7 @@ function App() {
               </StepView>
             </Box>
           </Paper>}
-          <Paper sx={{
+          <Paper className="fill-remaining" sx={{
             padding: 1,
             paddingTop: 3.5,
             position: "relative",
@@ -720,7 +936,12 @@ function App() {
             overflow: "visible"
           }}>
             <MapPickerView latLng={latLng} location={location} onLocationChange={(location) => {
-              setLatLng([location?.features[0].geometry.coordinates[1], location?.features[0].geometry.coordinates[0]])
+              if (!location?.features[0]) {
+                setLatLng(undefined)
+                setLocation(undefined)
+                return
+              }
+              setLatLng([location.features[0].geometry.coordinates[1], location.features[0].geometry.coordinates[0]])
               setLocation(location)
             }} />
             <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_ADDRESS)}>
@@ -737,7 +958,12 @@ function App() {
           }}>
             <BasicDateTimePicker onChange={(value) => {
               setDateOfIncident(value)
-            }} value={dateOfIncident} />
+            }} value={dateOfIncident} onExtractFromPhoto={async () => {
+              const selectedFile = [...files][currentFile ?? 0]
+              if (!selectedFile || !isImageReportFile(selectedFile)) return undefined
+              const tags = await ExifReader.load(selectedFile) as Record<string, ExifTag | undefined>
+              return parseExifDate(tags)
+            }} />
             <StepView hasError={reportError && reportError.has(ReportErrors.MISSING_DATE)}>
               5
             </StepView>
@@ -747,39 +973,112 @@ function App() {
             />
 
           </Paper>
+          {!isMobile && <Paper sx={{
+            overflow: "visible",
+            mt: { xs: 3, md: "auto" },
+            position: "relative",
+            width: "100%",
+          }}>
+            <Box sx={{ p: 1.5 }}>
+              <Button
+                onClick={handleVerifySubmit}
+                variant="contained"
+                sx={{
+                  width: "100%",
+                  minHeight: 56,
+                  position: "relative",
+                  borderRadius: "999px",
+                  textTransform: "none",
+                  fontWeight: 700,
+                  letterSpacing: 0,
+                  color: "#fff",
+                  background: "linear-gradient(135deg, #0f6fb2 0%, #0f766e 100%)",
+                  boxShadow: "0 10px 20px rgba(15, 111, 178, 0.22)",
+                  "&:hover": {
+                    background: "linear-gradient(135deg, #0b4f80 0%, #0a5651 100%)",
+                    boxShadow: "0 12px 24px rgba(15, 111, 178, 0.28)",
+                  },
+                }}
+              >
+                <Avatar sx={{
+                  position: "absolute",
+                  left: 8,
+                  width: 30,
+                  height: 30,
+                  bgcolor: "#f9d978",
+                  color: "#172033",
+                  boxShadow: "0 2px 6px rgba(15, 23, 42, 0.2)",
+                  fontSize: "0.95rem",
+                  fontWeight: 700
+                }}>6</Avatar>
+                Verify & Submit
+              </Button>
+            </Box>
+          </Paper>}
           {isMobile && <Paper sx={{
-            overflow: "display",
+            overflow: "visible",
             marginTop: 3,
             marginBottom: 1,
             position: "relative",
             width: "100%",
           }}>
             <Button
-              onClick={async () => {
-                const report = getReport()
-                setReportPreview(report)
-                setShowReportPreview(true)
-              }}
-              variant="text"
+              onClick={handleVerifySubmit}
+              variant="contained"
               sx={{
                 width: "100%",
                 height: "100%",
-                padding: 2
+                position: "relative",
+                minHeight: 52,
+                borderRadius: "999px",
+                textTransform: "none",
+                fontWeight: 700,
+                color: "#fff",
+                background: "linear-gradient(135deg, #0f6fb2 0%, #0f766e 100%)",
+                boxShadow: "0 10px 20px rgba(15, 111, 178, 0.22)",
+                "&:hover": {
+                  background: "linear-gradient(135deg, #0b4f80 0%, #0a5651 100%)",
+                  boxShadow: "0 12px 24px rgba(15, 111, 178, 0.28)",
+                },
               }}>
+              <Avatar sx={{
+                position: "absolute",
+                left: 8,
+                width: 28,
+                height: 28,
+                bgcolor: "#f9d978",
+                color: "#172033",
+                boxShadow: "0 2px 6px rgba(15, 23, 42, 0.2)",
+                fontSize: "0.9rem",
+                fontWeight: 700
+              }}>6</Avatar>
               VERIFY & SUBMIT
             </Button>
-            <StepView hasError={undefined}>6</StepView>
           </Paper>}
         </Box>
+        {showAuthModal &&
+          <LoginModal
+            open={showAuthModal}
+            onLoggedIn={handleCompletedAuth}
+            onGoogleSuccess={handleSuccess}
+            onGoogleError={handleError}
+            onAppleSignIn={() => {
+              enqueueSnackbar('Apple Sign in is not configured yet.', {
+                variant: 'info',
+              })
+            }}
+            onClose={() => {
+              continueVerifyAfterLoginRef.current = false
+              setShowAuthModal(false)
+            }}
+          />}
         {showLoginModal &&
           <LoginModal
             open={showLoginModal != undefined}
             payload={showLoginModal}
-            onLoggedIn={(user) => {
-              setIsSignedIn(user)
-              setShowLoginModal(undefined)
-            }}
+            onLoggedIn={handleCompletedAuth}
             onClose={() => {
+              continueVerifyAfterLoginRef.current = false
               setShowLoginModal(undefined)
             }
             } />}
@@ -788,27 +1087,10 @@ function App() {
             onCancel={() => {
               setShowReportPreview(false)
             }}
-            onComplete={(report) => {
+            onComplete={() => {
               setShowReportPreview(false)
               setReportPreview(undefined)
               clearState()
-              enqueueSnackbar(`${report.typeofcomplaint} w/ plate ${report.license} @ ${report.address.properties.label} at ${report.timeofreport}`, {
-                autoHideDuration: 20000,
-                variant: 'success',
-                action: (key) => (
-                  <>
-                    {/* <Button
-                          size='small'
-                          onClick={() => alert(`Clicked on action of snackbar with id: ${key}`)}
-                      >
-                          Undo
-                      </Button> */}
-                    <Button size='small' onClick={() => closeSnackbar(key)}>
-                      Dismiss
-                    </Button>
-                  </>
-                )
-              })
             }}
             open={showReportPreview}
             report={reportPreview} />}

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0",
     "build": "vite build",
     "deploy": "gh-pages -d reported",
     "predeploy": "BUILD_DATE=$(date +%Y%m%d) && echo $BUILD_DATE && sed -i.bak -E \"s/^BUILD_DATE=.*/BUILD_DATE=${BUILD_DATE}/\" .env && rm -f .env.bak && vite build --base=/",
@@ -64,6 +65,7 @@
     "@eslint/js": "^9.15.0",
     "@types/leaflet": "^1.9.16",
     "@types/parse": "^3.0.9",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react-swc": "^3.5.0",
@@ -72,6 +74,7 @@
     "eslint-plugin-react-refresh": "^0.4.14",
     "gh-pages": "^6.3.0",
     "globals": "^15.12.0",
+    "qrcode": "^1.5.4",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.15.0",
     "vite": "^6.0.1",

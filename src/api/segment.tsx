@@ -2,8 +2,8 @@ import { InferenceSession, Tensor, env } from "onnxruntime-web";
 import { download } from "../utils/download";
 import cv, { Mat } from "@techstark/opencv-js";
 import { yoloClassIndexToLabel, yoloSegClasses, yoloSegIndexToLabel, yoloSegVehicles } from "../labels";
-import heic2any from "heic2any";
 import { State } from "../States";
+import { isHeicFile } from "./file-utils";
 
 const models = [
     ['segment', 'yolov8n-seg'],
@@ -164,9 +164,10 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
         await downloadAll(()=>{})
         const image = new Image()
         let file2Use:string
-        if(file.type.toLowerCase()==="image/heic") {
+        if(isHeicFile(file)) {
             const uuu = URL.createObjectURL(file)
             try {
+            const heic2any = (await import("heic2any")).default
             const blob:Blob = await (await fetch(uuu)).blob()
             const converted = await heic2any({blob,
                 toType: "image/jpeg"

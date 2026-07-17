@@ -1,63 +1,106 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { TextField, Autocomplete, CircularProgress } from "@mui/material";
 import { Feature, GeoSearchResponse } from "./nyc";
 
 interface GeoSearchProps {
     initial?: GeoSearchResponse,
     onChange?: (resp:GeoSearchResponse, value:Feature) => void
+    onClear?: () => void
 }
 
-export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, initial }) => {
+export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, onClear, initial }) => {
   const [open, setOpen] = useState(false);
   const [response, setResponse] = useState<GeoSearchResponse>();
   const [options, setOptions] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState("");
 
   const [selectedValue, setSelectedValue] = useState<Feature>();
   const [inputValue, setInputValue] = useState<string>("");
+  const inputFocusedRef = useRef(false);
 
   useEffect(() => {
-    if (initial?.features?.length) {
-      setOptions(initial.features);
-      setSelectedValue(initial.features[0]);
-      setInputValue(initial.features[0]?.properties.label || "");
+    const initialFeature = initial?.features?.[0];
+    if (!initialFeature || inputFocusedRef.current) {
+      return;
     }
+    setOptions((currentOptions) => {
+      if (currentOptions.some((option) => option.properties.id === initialFeature.properties.id)) {
+        return currentOptions;
+      }
+      return [initialFeature, ...currentOptions];
+    });
+    setSelectedValue(initialFeature);
+    setInputValue(initialFeature.properties.label || "");
   }, [initial]);
 
-  const fetchGeoSearchResults = async (searchText: string) => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://geosearch.planninglabs.nyc/v2/search?text=${encodeURIComponent(searchText)}`
-      );
-      const data: GeoSearchResponse = await response.json();
-      setResponse(data);
-      setOptions(data.features || []);
-    } catch (error) {
-      console.error("Error fetching GeoSearch data:", error);
-    } finally {
+  useEffect(() => {
+    const searchText = inputValue.trim();
+    if (selectedValue?.properties.label === inputValue) {
       setLoading(false);
+      return;
     }
-  };
 
-  const handleChange = (value?: Feature) => {
+    if (searchText.length === 0) {
+      setResponse(undefined);
+      setOptions(initial?.features || []);
+      setLoading(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timeout = window.setTimeout(() => {
+      const fetchGeoSearchResults = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(
+            `https://geosearch.planninglabs.nyc/v2/search?text=${encodeURIComponent(searchText)}`,
+            { signal: abortController.signal }
+          );
+          const data: GeoSearchResponse = await response.json();
+          if (abortController.signal.aborted) {
+            return;
+          }
+          setResponse(data);
+          setOptions(data.features || []);
+          setOpen(true);
+        } catch (error) {
+          if (!abortController.signal.aborted) {
+            console.error("Error fetching GeoSearch data:", error);
+          }
+        } finally {
+          if (!abortController.signal.aborted) {
+            setLoading(false);
+          }
+        }
+      };
+      void fetchGeoSearchResults();
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      abortController.abort();
+    };
+  }, [inputValue, initial, selectedValue]);
+
+  const handleChange = (value?: Feature | string | null) => {
+    if (!value || typeof value === "string") {
+      setSelectedValue(undefined);
+      setInputValue("");
+      setResponse(undefined);
+      setOptions([]);
+      setOpen(false);
+      onClear?.();
+      return;
+    }
     setSelectedValue(value);
     setInputValue(value?.properties.label || "");
-    if (onChange && response) {
-      onChange(response, value);
+    if (onChange) {
+      onChange(response || {
+        type: "FeatureCollection",
+        features: [value],
+      }, value);
     }
   };
-
-  useEffect(() => {
-    if (query.trim().length > 0) {
-      fetchGeoSearchResults(query);
-    } else {
-      setOptions(initial?.features || []);
-      setInputValue(initial?.features[0]?.properties.label || "");
-      setSelectedValue(initial?.features[0] || undefined);
-    }
-  }, [query, initial]);
 
   return (
     <Autocomplete
@@ -69,11 +112,12 @@ export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, init
       options={options}
       freeSolo={true}
       loading={loading}
-      onChange={(event, value) => handleChange(value)}
+      clearOnEscape
+      onChange={(_event, value) => handleChange(value)}
       getOptionLabel={(option: any) => option?.properties?.label || ""}
-      onInputChange={(event, value, reason) => {
+      onInputChange={(_event, value, reason) => {
         if (reason !== "reset") {
-          setQuery(value);
+          setSelectedValue(undefined);
           setInputValue(value);
         }
       }}
@@ -85,6 +129,12 @@ export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, init
           {...params}
           label="Search NYC Address"
           variant="outlined"
+          onFocus={() => {
+            inputFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            inputFocusedRef.current = false;
+          }}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
@@ -93,6 +143,10 @@ export const GeoSearchAutocomplete: React.FC<GeoSearchProps> = ({ onChange, init
                 {params.InputProps.endAdornment}
               </>
             ),
+          }}
+          inputProps={{
+            ...params.inputProps,
+            autoComplete: "street-address",
           }}
         />
       )}

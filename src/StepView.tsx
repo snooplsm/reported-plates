@@ -1,4 +1,4 @@
-import { Avatar, Box } from "@mui/material"
+import { Box } from "@mui/material"
 
 export interface StepProps {
     children: React.ReactNode
@@ -30,12 +30,22 @@ export const StepView = ({children, hasError, sx}:StepProps) => {
             top: { xs: -16, md: -20 },
             left: 5,
             zIndex: 20
-          }}><Avatar sx={{
+          }}><Box sx={{
             bgcolor: bgcolor,
             color: fontcolor,
             boxShadow: 3,
+            minWidth: 34,
+            height: 30,
+            px: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 1,
+            fontSize: "0.82rem",
+            fontWeight: 800,
+            lineHeight: 1,
             ...sx
-          }}>{children}</Avatar>
+          }}>{children}</Box>
         </Box>
     )
 }

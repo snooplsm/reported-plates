@@ -67,9 +67,9 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
         <><Box
             sx={{
                 height: "100%",
+                minHeight: 0,
                 width: "100%",
-                maxHeight: "100vh",
-                overflowY: "auto",
+                overflowY: { xs: "visible", md: "auto" },
                 scrollBehavior: "smooth",
                 scrollbarWidth: "none", // For Firefox
                 '::-webkit-scrollbar': {
@@ -79,6 +79,7 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
+                justifyContent: { xs: "flex-start", md: "stretch" },
                 // justifyContent: 'center',                
             }}
         >
@@ -90,6 +91,11 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                     width: '100%',
                     maxWidth: '800px',
                     p: { xs: 1, sm: 2 },
+                    flex: { xs: "0 0 auto", md: "1 1 auto" },
+                    minHeight: { xs: "auto", md: 0 },
+                    display: "flex",
+                    flexDirection: "column",
+                    overflowY: { xs: "visible", md: "auto" },
                 }}
             >
                 <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', marginBottom: 1 }}>
@@ -243,7 +249,8 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                         <Box
                             sx={{
                                 position: 'relative',
-                                width: "30%",
+                                width: { xs: "48%", md: "34%" },
+                                minWidth: { xs: 150, md: 220 },
                                 borderRadius: 4,
                                 overflow: 'hidden',
                             }}

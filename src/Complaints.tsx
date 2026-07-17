@@ -1,4 +1,4 @@
-import { Box, Paper, Tooltip, Typography } from "@mui/material"
+import { Box, Button, Paper, Typography } from "@mui/material"
 import { useEffect, useRef, useState } from "react";
 // import Lottie, { LottieRef, LottieRefCurrentProps } from 'lottie-react';
 import Lottie from 'react-lottie-player'
@@ -6,8 +6,10 @@ import ranRedLight from "./lottie/ranredlight.json"
 import reckless from "./lottie/reckless.json"
 import noParking from "./lottie/parkedillegally.json"
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckIcon from '@mui/icons-material/Check';
 import { Steps } from "./HowToGuide";
 import TextFit from "react-textfit"
+import { REPORT_FILE_ACCEPT } from "./api/file-utils";
 
 export interface Complaint {
   type: ComplaintType;
@@ -190,17 +192,33 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
     <Box position="relative">      
       <input
         ref={inputRef}
-        accept="image/jpeg, image/heic, image/webp, video/*"
+        accept={REPORT_FILE_ACCEPT}
         type="file"
+        multiple
         hidden
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           const files = Array.from(e.currentTarget.files || [])
           if(files.length>0) {
-            const complaint = (selectedIndex && complaints[selectedIndex]) || undefined
+            const complaint = selectedIndex != undefined ? complaints[selectedIndex] : undefined
             onFiles(complaint, files)
           }
+          e.currentTarget.value = ""
         }} />
       <Box position="relative" sx={{ width: '100%' }}>
+        {!hideUpload && <Button
+          variant="contained"
+          startIcon={<CloudUploadIcon />}
+          onClick={() => {
+            onPrepareUpload?.()
+            inputRef.current?.click()
+          }}
+          sx={{ width: "100%", minHeight: 48, mb: 1, textTransform: "none", fontWeight: 700 }}
+        >
+          Add photos or video
+        </Button>}
+        {showCaption && <Typography variant="subtitle2" sx={{ px: .5, pb: .5, fontWeight: 700 }}>
+          Choose violation type
+        </Typography>}
         {/* First 4 Items */}
         <Box
           sx={{
@@ -220,8 +238,9 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
           }}
         >
           {complaints.map((item, index) => {
+            const isSelected = selectedIndex === index
             let filter = undefined
-            if (selectedIndex == index) {
+            if (isSelected) {
               filter = undefined
             } else if (hoveredIndex != undefined && hoveredIndex != index) {
               filter = "grayscale(100%)"
@@ -230,6 +249,10 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
               <Paper
                 elevation={3}
                 key={item.type + "_" + index}
+                role="button"
+                tabIndex={0}
+                aria-label={item.type}
+                aria-pressed={isSelected}
                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                   e.preventDefault()
                   setHoveredIndex(index)
@@ -251,8 +274,12 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 }}
                 onClick={() => {
                   handleSelect(index)
-                  onPrepareUpload?.()
-                  inputRef.current.click()                  
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    handleSelect(index)
+                  }
                 }}
                 onMouseLeave={(e) => {
                   // console.log("mouse leave")
@@ -268,61 +295,49 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                   overflow: 'hidden',
                   width: '100%',
                   aspectRatio: '1/1',
-                  borderRadius: 4,
-                  filter: undefined,
+                  position: "relative",
+                  boxSizing: "border-box",
+                  borderRadius: 1,
+                  border: isSelected ? "3px solid #15803d" : "1px solid rgba(15, 23, 42, 0.14)",
+                  bgcolor: isSelected ? "#f0fdf4" : "background.paper",
+                  boxShadow: isSelected
+                    ? "0 0 0 2px rgba(21, 128, 61, 0.16), 0 4px 12px rgba(15, 23, 42, 0.12)"
+                    : undefined,
+                  cursor: "pointer",
+                  transition: "border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+                  "&:focus-visible": {
+                    outline: "3px solid rgba(15, 111, 178, 0.35)",
+                    outlineOffset: 2,
+                  },
                 }}
-              ><ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} /></Paper>
+              >
+                <ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} />
+                {isSelected && <Box
+                  aria-hidden="true"
+                  sx={{
+                    position: "absolute",
+                    zIndex: 4,
+                    right: 0,
+                    bottom: 0,
+                    left: 0,
+                    height: 26,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 0.5,
+                    bgcolor: "#15803d",
+                    color: "#fff",
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                    letterSpacing: 0,
+                  }}
+                >
+                  <CheckIcon sx={{ fontSize: 17 }} />
+                  Selected
+                </Box>}
+              </Paper>
             )
           })}
-          {hideUpload!=true && <Paper
-            elevation={3}
-            onClick={()=> {
-              onPrepareUpload?.()
-              inputRef.current?.click()
-            }}
-            sx={{
-              width: "100%",
-              aspectRatio: "1/1",
-              backgroundColor: "yellow",
-              borderRadius: 4,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column"
-            }}
-          >
-            <Box sx={{
-              position: "absolute",
-              paddingLeft: "2%",
-              paddingTop: "1%",
-              cursor: "pointer"
-            }}
-
-            >
-              <CloudUploadIcon sx={{
-                width: "22%",
-                height: "22%",
-                justifyContent: "top",
-                position: "relative", // Centers icon horizontally in its flex container
-                top: 0,
-                left: 0,
-              }} />
-            </Box>
-            <Box
-              sx={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                fontSize: ".5rem",
-                alignItems: "center", // Centers text vertically
-                justifyContent: "center", // Centers text horizontally
-                textAlign: "center",
-                textWrap: "wrap",
-                cursor: "pointer"
-              }}
-            >
-              upload <br />or<br />drag & drop<br />jpeg, heic
-            </Box>
-          </Paper>}
         </Box>
       </Box>
       {showCaption && <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>}

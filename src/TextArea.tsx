@@ -6,33 +6,32 @@ interface TextProps {
   onChange:(newValue:string) => void
 }
 
-export default function MinHeightTextarea({value, onChange}:TextProps) {
-  const blue = {
-    100: '#DAECFF',
-    200: '#b6daff',
-    400: '#3399FF',
-    500: '#007FFF',
-    600: '#0072E5',
-    900: '#003A75',
-  };
+const blue = {
+  100: '#DAECFF',
+  200: '#b6daff',
+  400: '#3399FF',
+  500: '#007FFF',
+  600: '#0072E5',
+  900: '#003A75',
+};
 
-  const grey = {
-    50: '#F3F6F9',
-    100: '#E5EAF2',
-    200: '#DAE2ED',
-    300: '#C7D0DD',
-    400: '#B0B8C4',
-    500: '#9DA8B7',
-    600: '#6B7A90',
-    700: '#434D5B',
-    800: '#303740',
-    900: '#1C2025',
-  };
+const grey = {
+  50: '#F3F6F9',
+  100: '#E5EAF2',
+  200: '#DAE2ED',
+  300: '#C7D0DD',
+  400: '#B0B8C4',
+  500: '#9DA8B7',
+  600: '#6B7A90',
+  700: '#434D5B',
+  800: '#303740',
+  900: '#1C2025',
+};
 
-  const Textarea = styled(BaseTextareaAutosize)(
-    ({ theme }) => `
+const Textarea = styled(BaseTextareaAutosize)(
+  ({ theme }) => `
     box-sizing: border-box;
-    width: 320px;
+    width: 100%;
     font-family: 'IBM Plex Sans', sans-serif;
     font-size: 0.875rem;
     font-weight: 400;
@@ -58,16 +57,20 @@ export default function MinHeightTextarea({value, onChange}:TextProps) {
       outline: 0;
     }
   `,
-  );
+);
 
+export default function MinHeightTextarea({value, onChange}:TextProps) {
   return (
     <Box sx={{
-      // padding: 
-    }}>
-    <Textarea sx={{
       width: "100%",
-      
-    }} aria-label="minimum height" value={value} onChange={(event)=>onChange(event.target.value)} minRows={3} placeholder="Optional description of what you observed to send to the T&LC if applicable." />
+    }}>
+      <Textarea
+        aria-label="minimum height"
+        value={value}
+        onChange={(event)=>onChange(event.target.value)}
+        minRows={3}
+        placeholder="Optional description of what you observed to send to the T&LC if applicable."
+      />
     </Box>
   );
 }
