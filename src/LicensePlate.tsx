@@ -7,9 +7,10 @@ import { NYSTATE, State,  StatePres,  states } from "./States";
 type LicensePlateProps = {
   plate?: PlateDetection; // The text on the license plate
   onPlateChange?: (plate:PlateDetection) => void
+  subtleCorners?: boolean
 };
 
-const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
+const LicensePlate = ({ plate, onPlateChange = ()=>{}, subtleCorners = false }: LicensePlateProps) => {
 
   const [color, setColor] = useState(NYSTATE.plate.color)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -64,7 +65,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
         width: "100%", // Use rem instead of px for width
         aspectRatio: "2/1",
         background: plateState.plate.bg,
-        borderRadius: "1rem", // Rounded corners
+        borderRadius: subtleCorners ? "4px" : "1rem",
         border: "0.2rem solid #000000", // Border thickness
         display: "flex",
 
@@ -95,7 +96,7 @@ const LicensePlate = ({ plate, onPlateChange = ()=>{} }: LicensePlateProps) => {
           InputProps={{
             disableUnderline: true, // Disable underline
             sx: {
-              fontSize: { xs: "4rem", sm: "2.2rem", md: "clamp(1.9rem, 6vw, 2.5rem)" },
+              fontSize: { xs: "4rem", sm: "2.2rem", md: "2.15rem" },
               fontWeight: 600,  // Remove padding
               textAlign: "center",
               width: "100%",

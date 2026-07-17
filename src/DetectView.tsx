@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { DetectBox, detectPlate, PlateDetection, segment } from './api/segment';
+import type { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
 import { ToggleButtonGroup, ToggleButton, Paper, IconButton, Tooltip, useMediaQuery } from '@mui/material';
 import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import cv from "@techstark/opencv-js";
-import heic2any from "heic2any";
+import type { Mat, Rect } from "@techstark/opencv-js";
 import FilterCenterFocusIcon from '@mui/icons-material/FilterCenterFocus';
 import { isHeicFile } from './api/file-utils';
+import { getDisplayImageBlob } from './api/image-preview';
 
 type DetectProps = {
     file: File; // The title displayed on the card
@@ -42,6 +42,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
 
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [plate, setPlate] = useState<PlateDetection>()
+    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 })
 
     const [scale, setScale] = useState<number>(1); // Track zoom level
     const [offsetX, setOffsetX] = useState(0);
@@ -67,7 +68,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         }
     };
 
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const imgRef = useRef<HTMLImageElement | null>(null);
     const boxRef = useRef<HTMLElement | null>(null);
     const activePointersRef = useRef(new Map<number, PointerPosition>())
@@ -96,15 +96,14 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         }
     }
 
-    const getCanvasPoint = (clientX: number, clientY: number) => {
-        if(!canvasRef.current) {
+    const getImagePoint = (clientX: number, clientY: number) => {
+        const image = imgRef.current
+        if (!image || image.naturalWidth === 0 || image.naturalHeight === 0) {
             return null
         }
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = canvasRef.current.width / rect.width;
-        const scaleY = canvasRef.current.height / rect.height;
-        const x = Math.max(0, Math.min(canvasRef.current.width, (clientX - rect.left) * scaleX));
-        const y = Math.max(0, Math.min(canvasRef.current.height, (clientY - rect.top) * scaleY));
+        const rect = image.getBoundingClientRect();
+        const x = Math.max(0, Math.min(image.naturalWidth, (clientX - rect.left) * image.naturalWidth / rect.width));
+        const y = Math.max(0, Math.min(image.naturalHeight, (clientY - rect.top) * image.naturalHeight / rect.height));
         return { x, y }
     }
 
@@ -131,7 +130,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
     }
 
     const onPointerDown = (e: React.PointerEvent) => {
-        if(!canvasRef.current) {
+        if(!imgRef.current) {
             return
         }
         if (e.pointerType === "mouse" && e.button !== 0) {
@@ -173,7 +172,7 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             setPosition([e.clientX, e.clientY, 0, 0])
             return
         }
-        const point = getCanvasPoint(e.clientX, e.clientY)
+        const point = getImagePoint(e.clientX, e.clientY)
         if (!point) {
             return
         }
@@ -182,10 +181,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             setBoundingBox([point.x, point.y, point.x, point.y])
         }
     }
-
-    useEffect(() => {
-        console.log("position changed", position)
-    }, [position])
 
     const onPointerEnd = (e: React.PointerEvent) => {
         activePointersRef.current.delete(e.pointerId)
@@ -196,47 +191,34 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             e.currentTarget.releasePointerCapture(e.pointerId)
         }
         if (isDragging && boundingBox) {
-            if(!canvasRef.current) {
-                return
-            }
-            if(!imgRef.current) {
-                return
-            }
-            if(!imageSrc) {
-                return
-            }
-            const rect = canvasRef.current.getBoundingClientRect();
-            const scaleX = canvasRef.current.width / rect.width; // Horizontal scaling factor
-            const scaleY = canvasRef.current.height / rect.height; // Vertical scaling factor
-            const bbox = boundingBox
-            const image = new Image()
-            image.src = imageSrc
-            image.onload = async () => {
-                console.log(bbox)
-                const mat = cv.imread(image)
+            const image = imgRef.current
+            if (image) {
+                const left = Math.max(0, Math.floor(Math.min(boundingBox[0], boundingBox[2])))
+                const top = Math.max(0, Math.floor(Math.min(boundingBox[1], boundingBox[3])))
+                const right = Math.min(image.naturalWidth, Math.ceil(Math.max(boundingBox[0], boundingBox[2])))
+                const bottom = Math.min(image.naturalHeight, Math.ceil(Math.max(boundingBox[1], boundingBox[3])))
+                const width = right - left
+                const height = bottom - top
 
-                const width = mat.cols
-                const height = mat.rows
-                const scaleX2 = rect.width / width; // Horizontal scaling factor
-                const scaleY2 = rect.height / height; // Vertical scaling factor
-                const scaledBox = bbox.map((x, i) => {
-                    const scale = (i % 2 === 0) ? scaleX : scaleY; // Determine scale based on index
-                    return x / scale; // Apply scaling
-                });
-                const x1 = scaledBox[0] / scaleX2
-                const y1 = scaledBox[1] / scaleY2
-                const x2 = scaledBox[2] / scaleX2
-                const y2 = scaledBox[3] / scaleY2
-                console.log(x1, y1, x2, y2)
-                const rectRoi = new cv.Rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1))
-                await runPlateFromRect(mat, rectRoi)
+                if (width >= 4 && height >= 4) {
+                    void import("@techstark/opencv-js").then(({ default: cv }) => {
+                        const mat = cv.imread(image)
+                        return runPlateFromRect(mat, new cv.Rect(left, top, width, height))
+                    })
+                }
             }
+            setSelectedOption(CanvasOption.Pan)
+            setCursor("grab")
         }
         setIsDragging(false)
         setIsPanning(false)
     }
 
-    const runPlateFromRect = async (mat: cv.Mat, rectRoi: cv.Rect) => {
+    const runPlateFromRect = async (mat: Mat, rectRoi: Rect) => {
+        const [{ default: cv }, { detectPlate }] = await Promise.all([
+            import("@techstark/opencv-js"),
+            import('./api/segment'),
+        ])
         const roi = mat.roi(rectRoi)
         cv.cvtColor(roi, roi, cv.COLOR_RGBA2RGB);
         mat.delete()
@@ -274,17 +256,17 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         if (isMobile && e.pointerType === "touch" && activePoints.length < 2) {
             return
         }
-        const point = getCanvasPoint(e.clientX, e.clientY)
-        if (!point) {
-            return
-        }
-        e.preventDefault()
-        const { x, y } = point
-
         if (isDragging) {
+            const point = getImagePoint(e.clientX, e.clientY)
+            if (!point) {
+                return
+            }
+            e.preventDefault()
+            const { x, y } = point
             const box:[x1: number, y1: number, x2: number, y2: number] = [position[0], position[1], x, y]
             setBoundingBox(box)
         } else if (isPanning) {
+            e.preventDefault()
             const dx = e.clientX - position[0];
             const dy = e.clientY - position[1];
             const next = clampOffsets(scale, offsetX + dx, offsetY + dy)
@@ -319,17 +301,14 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
     };
 
     useEffect(() => {
+        let cancelled = false
+        let localUrl = ''
         const fetchImage = async () => {
             let file2Use: string;
 
             if (isHeicFile(file)) {
-                const uuu = URL.createObjectURL(file);
                 try {
-                    const blob: Blob = await (await fetch(uuu)).blob();
-                    const converted = await heic2any({
-                        blob,
-                        toType: "image/jpeg",
-                    }) as Blob;
+                    const converted = await getDisplayImageBlob(file)
                     file2Use = URL.createObjectURL(converted);
                 } catch (e) {
                     console.log(e);
@@ -338,12 +317,19 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
             } else {
                 file2Use = URL.createObjectURL(file);
             }
+            localUrl = file2Use
+            if (cancelled) {
+                URL.revokeObjectURL(file2Use)
+                return
+            }
             setImageSrc(file2Use);
             // Always reset viewport when a new file is loaded so the full image is visible.
             setScale(1)
             setOffsetX(0)
             setOffsetY(0)
             setBoundingBox(undefined)
+            setImageDimensions({ width: 0, height: 0 })
+            setPlate(undefined)
             setIsDragging(false)
             setIsPanning(false)
             activePointersRef.current.clear()
@@ -351,11 +337,15 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         };
 
         fetchImage();
+        return () => {
+            cancelled = true
+            if (localUrl) URL.revokeObjectURL(localUrl)
+        }
     }, [file]);
 
     useEffect(() => {
         const detect = boxes?.[0]?.plate || null;
-        if (detect && plate !== detect) {
+        if (detect && !plate) {
             setPlate(detect);
         }
     }, [boxes, plate]);
@@ -374,58 +364,6 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
         };
     }, [boxRef.current, scale, offsetX, offsetY])
 
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext("2d");
-
-        if (ctx == null) {
-            return
-        }
-        if (canvas == null) {
-            return
-        }
-        const draw = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (!boundingBox) {
-                return
-            }
-            
-            ctx.imageSmoothingEnabled = false;
-            ctx.fillStyle = "#8F00FF88";            
-            ctx.fillRect(boundingBox[0], boundingBox[1], boundingBox[2] - boundingBox[0], boundingBox[3] - boundingBox[1]); // Coordinates are transformed
-            ctx.beginPath()
-            ctx.arc(canvas.width / 2, canvas.height / 2, 1, 0, 360)
-            ctx.fill()
-            ctx.closePath()
-            ctx.restore();
-        };
-
-        draw();
-
-    }, [scale, boundingBox, offsetX, offsetY])
-
-    useEffect(() => {
-        const syncCanvasSize = () => {
-            const canvas = canvasRef.current
-            const image = imgRef.current
-            if (!canvas || !image) {
-                return
-            }
-            const nextWidth = Math.max(1, Math.round(image.clientWidth))
-            const nextHeight = Math.max(1, Math.round(image.clientHeight))
-            if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-                canvas.width = nextWidth
-                canvas.height = nextHeight
-            }
-        }
-
-        syncCanvasSize()
-        window.addEventListener("resize", syncCanvasSize)
-        return () => {
-            window.removeEventListener("resize", syncCanvasSize)
-        }
-    }, [imageSrc])
-
     if (file == null) {
         return null
     } else
@@ -435,7 +373,8 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                 overflow: "hidden",
                 margin: 1,
                 width: "auto",
-                height: "auto"
+                height: "auto",
+                minHeight: imageSrc ? 0 : 180,
             }}>
                 <Box
                     ref={boxRef}
@@ -462,6 +401,12 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                         {imageSrc && <img
                             ref={imgRef}
                             src={imageSrc}
+                            onLoad={(event) => {
+                                setImageDimensions({
+                                    width: event.currentTarget.naturalWidth,
+                                    height: event.currentTarget.naturalHeight,
+                                })
+                            }}
                             style={{
                                 width: "100%",
                                 height: "auto",
@@ -469,19 +414,82 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                                 cursor: cursor,
                             }}
                         />}
-                        <canvas
-                            ref={canvasRef}
-                            style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                width: "100%",
-                                height: "100%",
-                                display: "block",
-                                cursor: cursor,
-                                pointerEvents: "auto"
-                            }}
-                        />
+                        {boundingBox && imageDimensions.width > 0 && imageDimensions.height > 0 && (() => {
+                            const left = Math.min(boundingBox[0], boundingBox[2]) / imageDimensions.width * 100
+                            const top = Math.min(boundingBox[1], boundingBox[3]) / imageDimensions.height * 100
+                            const width = Math.abs(boundingBox[2] - boundingBox[0]) / imageDimensions.width * 100
+                            const height = Math.abs(boundingBox[3] - boundingBox[1]) / imageDimensions.height * 100
+                            return <Box sx={{
+                                position: 'absolute',
+                                zIndex: 3,
+                                left: `${left}%`,
+                                top: `${top}%`,
+                                width: `${width}%`,
+                                height: `${height}%`,
+                                boxSizing: 'border-box',
+                                border: '3px solid #16a34a',
+                                bgcolor: 'rgba(22, 163, 74, 0.12)',
+                                boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                                pointerEvents: 'none',
+                            }} />
+                        })()}
+                        {imageDimensions.width > 0 && imageDimensions.height > 0 && boxes
+                            ?.filter(candidate => candidate.file === file && candidate.plate?.box)
+                            .map((candidate, index) => {
+                                const candidatePlate = candidate.plate!
+                                const carBox = candidate.scaled || candidate.box
+                                const plateBox = candidatePlate.sourceBox || candidatePlate.box
+                                const left = (carBox[0] + plateBox[0]) / imageDimensions.width * 100
+                                const top = (carBox[1] + plateBox[1]) / imageDimensions.height * 100
+                                const width = plateBox[2] / imageDimensions.width * 100
+                                const height = plateBox[3] / imageDimensions.height * 100
+                                const selected = candidatePlate === plate
+                                return <Box
+                                    component="button"
+                                    type="button"
+                                    key={`${candidate.index}_${index}_${candidatePlate.text || 'plate'}`}
+                                    aria-label={`Select plate ${candidatePlate.text || index + 1}`}
+                                    aria-pressed={selected}
+                                    onPointerDown={(event) => {
+                                        if (event.pointerType === 'mouse') event.stopPropagation()
+                                    }}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        setPlate(candidatePlate)
+                                        onCarWithPlate?.(boxes, candidate)
+                                    }}
+                                    sx={{
+                                        position: 'absolute',
+                                        zIndex: 4,
+                                        left: `${left}%`,
+                                        top: `${top}%`,
+                                        width: `${width}%`,
+                                        height: `${height}%`,
+                                        p: 0,
+                                        border: selected ? '3px solid #16a34a' : '3px solid #f59e0b',
+                                        bgcolor: selected ? 'rgba(22, 163, 74, 0.16)' : 'rgba(245, 158, 11, 0.12)',
+                                        boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                                        cursor: 'pointer',
+                                        borderRadius: 0,
+                                    }}
+                                >
+                                    <Box component="span" sx={{
+                                        position: 'absolute',
+                                        left: -3,
+                                        bottom: '100%',
+                                        px: 0.5,
+                                        py: 0.15,
+                                        bgcolor: selected ? '#16a34a' : '#f59e0b',
+                                        color: selected ? '#fff' : '#111827',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        lineHeight: 1.3,
+                                        whiteSpace: 'nowrap',
+                                    }}>
+                                        {candidatePlate.text || `Plate ${index + 1}`}
+                                    </Box>
+                                </Box>
+                            })}
                     </Box>
                 </Box>
                 <Box sx={{
@@ -519,7 +527,8 @@ const DetectView= ({ file, boxes, onPlate, onCarWithPlate }:DetectProps) => {
                     </ToggleButton>
                 </ToggleButtonGroup>
                 <Tooltip title="Run plate detector on this image">
-                    <IconButton aria-label="Detect license plate" onClick={()=> {
+                    <IconButton aria-label="Detect license plate" onClick={async ()=> {
+                        const { segment } = await import('./api/segment')
                         segment(file)
                         .then(result=> {
                             if (result) {

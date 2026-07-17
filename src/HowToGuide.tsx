@@ -251,11 +251,11 @@ const HowToGuide = ({ videoUrl, onStepHovered = ()=> {} }: HowToGuideProps) => {
                                 position: 'relative',
                                 width: { xs: "48%", md: "34%" },
                                 minWidth: { xs: 150, md: 220 },
-                                borderRadius: 4,
+                                borderRadius: "4px",
                                 overflow: 'hidden',
                             }}
                         >
-                            <LicensePlate />
+                            <LicensePlate subtleCorners />
                         </Box>
                     </ListItem>
                     <ListItem sx={{ px: { xs: 0.5, sm: 2 } }} onMouseOver={() => onStepHovered && onStepHovered(Steps.VERIFY_AND_SUBMIT)} onMouseLeave={() => onStepHovered && onStepHovered(undefined)}>

@@ -1,9 +1,8 @@
 import { Avatar, Box, LinearProgress, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
-import heic2any from "heic2any";
-
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import { isHeicFile, isVideoReportFile } from './api/file-utils';
+import { getDisplayImageBlob } from './api/image-preview';
 
 interface FileProps {
   id: string,
@@ -34,11 +33,17 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
           setPreviewText("Converting HEIC...");
           setPreviewProgress(45);
           onProcessingChange?.(id, { text: "Converting HEIC...", progress: 45 });
-          blob = await heic2any({
-            blob: file,
-            toType: "image/jpeg",
-            quality: 1,
-          }) as Blob;
+          let timeoutId: number | undefined
+          try {
+            blob = await Promise.race([
+              getDisplayImageBlob(file),
+              new Promise<Blob>((_resolve, reject) => {
+                timeoutId = window.setTimeout(() => reject(new Error("HEIC preview timed out")), 30_000)
+              }),
+            ])
+          } finally {
+            if (timeoutId != null) window.clearTimeout(timeoutId)
+          }
           if (cancelled) {
             return;
           }
@@ -65,10 +70,10 @@ export const FileUploadPreview = ({id, file, onClick, onClickDelete, onProcessin
         if (isHeic) {
           onProcessingChange?.(id, { text: "HEIC ready", progress: 100 });
         }
-        onProcessingChange?.(id, undefined);
       } catch (err) {
         console.error("Failed to process file", err);
         setPreviewText("Preview failed");
+      } finally {
         onProcessingChange?.(id, undefined);
       }
     };

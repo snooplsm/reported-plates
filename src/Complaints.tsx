@@ -333,7 +333,6 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                   }}
                 >
                   <CheckIcon sx={{ fontSize: 17 }} />
-                  Selected
                 </Box>}
               </Paper>
             )

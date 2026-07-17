@@ -1,11 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import * as ExifReader from 'exifreader';
 import { getFileHash, isImageReportFile, isSupportedReportFile, isVideoReportFile, MAX_REPORT_IMAGES, MAX_REPORT_VIDEOS } from './api/file-utils';
 import reported, { ReportedKeys } from './Reported';
 import type { DetectBox, PlateDetection } from './api/segment';
 import Box from '@mui/material/Box';
-import { Button, CssBaseline, ThemeProvider, Paper, LinearProgress, useMediaQuery, Avatar } from "@mui/material";
+import { Button, CssBaseline, ThemeProvider, Paper, useMediaQuery, Avatar } from "@mui/material";
 import theme from './theme';
 import { fetchGeoData, GeoSearchResponse } from './api/ny/nyc/nyc';
 import { Complaint, complaints, ComplaintsView } from './Complaints';
@@ -29,8 +29,7 @@ import { SnackbarProvider, enqueueSnackbar } from 'notistack';
 import { LargeDragDropView } from './LargeDragDropView';
 import { clearReportDraft, loadReportDraft, saveReportDraft } from './reportDraft';
 import { DevQrCode } from './DevQrCode';
-
-const DetectView = lazy(() => import('./DetectView'))
+import DetectView from './DetectView';
 
 type ExifTag = {
   description?: string
@@ -119,6 +118,7 @@ function App() {
   const userRef = useRef<UserViewRef | null>(null)
   const geoFallbackAttemptedRef = useRef(false)
   const continueVerifyAfterLoginRef = useRef(false)
+  const restoredDetectionPendingRef = useRef(false)
 
   const clearState = () => {
     setFiles(new Set())
@@ -162,6 +162,7 @@ function App() {
       plate.plateOverride = plates.plateOverride
       plate.tlc = plates.tlc
       plate.box = plates.box
+      plate.sourceBox = plates.sourceBox
       plate.image = plates.image
       plate.nypd = plates.nypd
       plate.textLetterProb = plates.textLetterProb
@@ -187,7 +188,10 @@ function App() {
         const restoredFiles = (draft.files || []).filter(isSupportedReportFile)
         setFiles(new Set(restoredFiles))
         setFileNames(new Set(restoredFiles.map(file => file.name)))
-        if (restoredFiles.length > 0) setCurrentFile(0)
+        if (restoredFiles.length > 0) {
+          restoredDetectionPendingRef.current = true
+          setCurrentFile(0)
+        }
         setComplaint(complaints.find(item => item.type === draft.complaintType))
         setLocation(draft.location)
         setLatLng(draft.latLng)
@@ -244,6 +248,7 @@ function App() {
   const warmupPromiseRef = useRef<Promise<void> | null>(null)
   const segmentApiPromiseRef = useRef<Promise<typeof import('./api/segment')> | null>(null)
   const autoDetectTimerRef = useRef<number | null>(null)
+  const autoDetectIdleRef = useRef<number | null>(null)
   const autoDetectRunIdRef = useRef(0)
   const onHeicProcessingChange = useCallback((id: string, status?: { text: string; progress: number }) => {
     setHeicProcessing((prev) => {
@@ -256,6 +261,21 @@ function App() {
       return next
     })
   }, [])
+
+  useEffect(() => {
+    if (Object.keys(heicProcessing).length === 0) return
+    const timeout = window.setTimeout(() => setHeicProcessing({}), 35_000)
+    return () => window.clearTimeout(timeout)
+  }, [heicProcessing])
+
+  useEffect(() => {
+    if (!isModelLoading) return
+    const timeout = window.setTimeout(() => {
+      setIsModelLoading(false)
+      warmupPromiseRef.current = null
+    }, 45_000)
+    return () => window.clearTimeout(timeout)
+  }, [isModelLoading, modelLoadState.progress])
 
   useEffect(() => {
     const worker = new Worker(new URL('./workers/modelWarmup.worker.ts', import.meta.url), { type: 'module' })
@@ -295,6 +315,10 @@ function App() {
         window.clearTimeout(autoDetectTimerRef.current)
         autoDetectTimerRef.current = null
       }
+      if (autoDetectIdleRef.current != null && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(autoDetectIdleRef.current)
+        autoDetectIdleRef.current = null
+      }
     }
   }, [])
 
@@ -304,6 +328,35 @@ function App() {
     }
     return segmentApiPromiseRef.current
   }
+
+  useEffect(() => {
+    if (!draftReady || !restoredDetectionPendingRef.current || results || files.size === 0) {
+      return
+    }
+    const imageFile = [...files].find(isImageReportFile)
+    if (!imageFile) {
+      return
+    }
+
+    restoredDetectionPendingRef.current = false
+    const timer = window.setTimeout(() => {
+      const runDetection = async () => {
+        const { segment } = await loadSegmentApi()
+        const result = await segment(imageFile)
+        const carWithPlates = result?.filter(candidate => candidate.plate != null) || []
+        setResults(carWithPlates)
+        if (carWithPlates[0]) {
+          setCar(current => current || carWithPlates[0])
+          setPlate(current => current || carWithPlates[0].plate!)
+        }
+      }
+      void runDetection().catch(error => {
+        console.log(error)
+      })
+    }, 100)
+
+    return () => window.clearTimeout(timer)
+  }, [draftReady, files, results])
 
   useEffect(() => {
     const hasFiles = (e: DragEvent) =>
@@ -661,38 +714,24 @@ function App() {
               setPlate((prev) => prev || carWithPlate.plate!)
             }
           }
-          void runDetection().catch(console.log)
+          if ('requestIdleCallback' in window) {
+            autoDetectIdleRef.current = window.requestIdleCallback(() => {
+              autoDetectIdleRef.current = null
+              void runDetection().catch(console.log)
+            })
+          } else {
+            void runDetection().catch(console.log)
+          }
         }, 1200)
       }
       void processFiles()
     }))
   }
-  const heicStates = Object.values(heicProcessing)
-  const isHeicProcessing = heicStates.length > 0
-  const heicProgress = isHeicProcessing
-    ? heicStates.reduce((acc, state) => acc + state.progress, 0) / heicStates.length
-    : 0
-  const topBarValue = isModelLoading ? modelLoadState.progress : heicProgress
-
   return (
 
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <DevQrCode />
-      {(isModelLoading || isHeicProcessing) && <Paper sx={{
-        position: "fixed",
-        zIndex: 1400,
-        top: 0,
-        left: 0,
-        width: "100%",
-        borderRadius: 0,
-        padding: 0,
-        background: "transparent",
-        border: 0,
-        boxShadow: "none"
-      }}>
-        <LinearProgress variant="determinate" value={topBarValue} sx={{ height: 3 }} />
-      </Paper>}
       {showDragView && <LargeDragDropView onFiles={onFiles} />}
       <Box
         display="flex"
@@ -866,16 +905,14 @@ function App() {
                 setHoveredStep(step)
               }} handleError={handleError} isSignedIn={isSignedIn} handleSuccess={handleSuccess} videoUrl='video/howto1.mp4' />}
             {currentFile != undefined && currentFile >= 0 &&
-              <Suspense fallback={<Paper sx={{ p: 2 }}><LinearProgress /></Paper>}>
-                <DetectView file={[...files][currentFile]} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
-                  setResults(result)
-                  // setBoxes(result)
-                  setCar(car)
-                  setPlate(car.plate!)
-                }} onPlate={(manualPlate) => {
-                  setPlate(manualPlate)
-                }} />
-              </Suspense>
+              <DetectView file={[...files][currentFile]} boxes={results} onCarWithPlate={(result: DetectBox[], car: DetectBox) => {
+                setResults(result)
+                // setBoxes(result)
+                setCar(car)
+                setPlate(car.plate!)
+              }} onPlate={(manualPlate) => {
+                setPlate(manualPlate)
+              }} />
             }
           </Box>
         </Box>

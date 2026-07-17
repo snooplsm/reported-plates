@@ -393,6 +393,8 @@ export const segment = async (file: File): Promise<DetectBox[]> => {
                     const parsedPlate = await detectPlate(plateCrop)
                     plateCrop.delete()
                     parsedPlate.box = [finalRect.x, finalRect.y, finalRect.width, finalRect.height]
+                    const sourceRect = firstRect || finalRect
+                    parsedPlate.sourceBox = [sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height]
                     parsedPlate.probability = chosenDetection.confidence
                     box.plate = parsedPlate
                 }
@@ -1014,6 +1016,7 @@ export interface DetectBox {
 
 export interface PlateDetection {
     box: [x: number, y: number, w: number, h: number],
+    sourceBox?: [x: number, y: number, w: number, h: number],
     probability: number,
     image?: Blob
     state?: State

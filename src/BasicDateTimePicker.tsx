@@ -231,7 +231,7 @@ export const BasicDateTimePicker = ({ onChange, value, onlyDate = false, label, 
       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
         {label || (onlyDate ? 'Date' : 'Time of incident')}
       </Typography>
-      {isMobile && !onlyDate ? <>
+      {!onlyDate ? <>
         <Button
           fullWidth
           variant="outlined"
@@ -259,7 +259,13 @@ export const BasicDateTimePicker = ({ onChange, value, onlyDate = false, label, 
         {extractError && <Typography color="error" variant="caption" sx={{ display: 'block', mt: 0.5 }}>
           {extractError}
         </Typography>}
-        <Dialog fullScreen open={pickerOpen} onClose={() => setPickerOpen(false)}>
+        <Dialog
+          fullScreen={isMobile}
+          fullWidth
+          maxWidth="md"
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+        >
           <DialogTitle sx={{ fontWeight: 800 }}>Time of incident</DialogTitle>
           <DialogContent dividers sx={{ display: 'flex', alignItems: 'center' }}>
             <Box sx={{
