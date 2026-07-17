@@ -117,7 +117,7 @@ export const submitReport = async (r: Report, phone?: string):Promise<SimpleRepo
     s.set('timeofreport', r.timeofreport)
     s.set('LastName', current.get('LastName') || user.firstName)
     s.set('FirstName', current.get('FirstName') || user.lastName)
-    s.set('Status', 0)
+    s.set('status', 0)
     s.set('longitude1', r.address.geometry.coordinates[0])
     s.set('latitude1', r.address.geometry.coordinates[1])
     s.set('latitude', r.address.geometry.coordinates[1].toString())
@@ -242,7 +242,7 @@ const transformSubmission = (p: Parse.Object): SimpleReport => {
     const location = Number.isFinite(latitude) && Number.isFinite(longitude)
         ? [latitude, longitude]
         : undefined
-    const status = p.get('Status') ?? p.get('status') ?? 0
+    const status = p.get('status') ?? p.get('Status') ?? 0
 
     return {
         id: p.id,
