@@ -50,6 +50,7 @@ const LoginModal = ({
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading,setLoading] = useState(false)
+  const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false)
   const isLinkingGoogleAccount = payload != undefined
   const isSmallScreen = useMediaQuery('(max-width:420px)')
   const providerButtonWidth = isSmallScreen ? 240 : 320
@@ -88,7 +89,7 @@ const LoginModal = ({
     }
     forgotEmail(email.trim())
       .then(() => {
-        enqueueSnackbar('Password reset email sent.', { variant: 'info', autoHideDuration: 3000 })
+        setResetConfirmationOpen(true)
       })
       .catch((e) => {
         console.log(e)
@@ -97,6 +98,7 @@ const LoginModal = ({
   }
 
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{isLinkingGoogleAccount ? 'Log in with password to link account with Google' : 'Log In'}</DialogTitle>
       <DialogContent>
@@ -237,6 +239,25 @@ const LoginModal = ({
         </Button>
       </DialogActions>
     </Dialog>
+    <Dialog
+      open={resetConfirmationOpen}
+      onClose={() => setResetConfirmationOpen(false)}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>Password reset email sent</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary">
+          Check {email.trim()} for instructions to reset your password.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button variant="contained" onClick={() => setResetConfirmationOpen(false)}>
+          OK
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 };
 
