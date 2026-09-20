@@ -34,6 +34,14 @@ export enum MediaType {
   Lottie = 'lottie'
 }
 
+const complaintLabels: Record<ComplaintType, string> = {
+  [ComplaintType.BlockedBikeLane]: 'Blocked bike lane',
+  [ComplaintType.BlockedCrosswalk]: 'Blocked crosswalk',
+  [ComplaintType.RanRedLight]: 'Red light / stop sign',
+  [ComplaintType.ParkedIllegally]: 'Parked illegally',
+  [ComplaintType.DroveRecklessly]: 'Drove recklessly'
+}
+
 export const complaints: Complaint[] = [
   {
     type: ComplaintType.BlockedBikeLane,
@@ -125,13 +133,15 @@ interface ComplaintsProps {
   selectedComplaint?: Complaint
   onChange: (complaint?: Complaint) => void
   hideUpload?:boolean
+  dragDropMode?: boolean
 }
 
-export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplaint, onChange, hideUpload=false, hoveredStep, showCaption }: ComplaintsProps) => {
+export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplaint, onChange, hideUpload=false, dragDropMode=false, hoveredStep, showCaption }: ComplaintsProps) => {
 
   const inputRef = useRef<HTMLInputElement>()
 
   const [hoveredIndex, setHoveredIndex] = useState<number | undefined>()
+  const [draggedOverIndex, setDraggedOverIndex] = useState<number | undefined>()
 
   const [selectedIndex, setSelectedIndex] = useState<number | undefined>()
 
@@ -159,32 +169,6 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
       setSelectedIndex(undefined)
     }
   }, [selectedComplaint])
-
-  const [tooltip, setTooltip] = useState("Blocked")
-
-  const [display, setDisplay] = useState<string | undefined>("hidden")
-
-  useEffect(() => {
-    // console.log("hoverIndex", hoveredIndex)
-    if (selectedIndex != undefined) {
-      setDisplay("inline")
-      setTooltip(complaints[selectedIndex].type)
-    } else {
-      if (hoveredIndex != undefined) {
-        // console.log("not undefined")
-        setDisplay("inline")
-        // console.log(complaints[hoveredIndex!].type)
-        setTooltip(complaints[hoveredIndex!].type)
-      } else {
-        // console.log("undefined")
-        if (selectedIndex != undefined) {
-          setDisplay("inline")
-        } else {
-          setDisplay("hidden")
-        }
-      }
-    }
-  }, [hoveredIndex, selectedIndex])
 
   return (
     <Box position="relative">      
@@ -230,19 +214,20 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
           }}
           onDrop={() => {
             setHoveredIndex(undefined)
+            setDraggedOverIndex(undefined)
           }}
-          onDragLeave={() => {
-            setHoveredIndex(undefined)
+          onDragLeave={(event) => {
+            const nextTarget = event.relatedTarget as Node | null
+            if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+              setHoveredIndex(undefined)
+              setDraggedOverIndex(undefined)
+            }
           }}
         >
           {complaints.map((item, index) => {
             const isSelected = selectedIndex === index
-            let filter = undefined
-            if (isSelected) {
-              filter = undefined
-            } else if (hoveredIndex != undefined && hoveredIndex != index) {
-              filter = "grayscale(100%)"
-            }
+            const isDragTarget = dragDropMode && draggedOverIndex === index
+            const isAnotherDragTarget = dragDropMode && draggedOverIndex !== undefined && !isDragTarget
             return (
               <Paper
                 elevation={3}
@@ -253,21 +238,25 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 aria-pressed={isSelected}
                 onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
                   e.preventDefault()
+                  e.dataTransfer.dropEffect = "copy"
                   setHoveredIndex(index)
+                  setDraggedOverIndex(index)
                 }}
                 onDragEnd={()=> {
                   setHoveredIndex(undefined)
+                  setDraggedOverIndex(undefined)
                 }}
-                onDragEnter={(e: DragEvent) => {
-                  // console.log("drag enter")
+                onDragEnter={(e: React.DragEvent<HTMLDivElement>) => {
                   setHoveredIndex(index)
+                  setDraggedOverIndex(index)
                   e.preventDefault()
                 }}
                 onDrop={(e: React.DragEvent<HTMLDivElement>) => {
                   handleDrop(onFiles, item, e)
                   setHoveredIndex(undefined)
+                  setDraggedOverIndex(undefined)
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={() => {
                   setHoveredIndex(index)
                 }}
                 onClick={() => {
@@ -280,7 +269,6 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                   }
                 }}
                 onMouseLeave={(e) => {
-                  // console.log("mouse leave")
                   if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                     setHoveredIndex(undefined)
                   }
@@ -288,6 +276,11 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 }}
                 onDragLeave={(e) => {
                   e.preventDefault()
+                  const nextTarget = e.relatedTarget as Node | null
+                  if (!nextTarget || !e.currentTarget.contains(nextTarget)) {
+                    setHoveredIndex(undefined)
+                    setDraggedOverIndex(undefined)
+                  }
                 }}
                 sx={{
                   overflow: 'hidden',
@@ -296,13 +289,22 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                   position: "relative",
                   boxSizing: "border-box",
                   borderRadius: 1,
-                  border: isSelected ? "3px solid #15803d" : "1px solid rgba(15, 23, 42, 0.14)",
-                  bgcolor: isSelected ? "#f0fdf4" : "background.paper",
-                  boxShadow: isSelected
-                    ? "0 0 0 2px rgba(21, 128, 61, 0.16), 0 4px 12px rgba(15, 23, 42, 0.12)"
-                    : undefined,
+                  border: isDragTarget
+                    ? "3px dashed #0f6fb2"
+                    : isSelected
+                      ? "3px solid #15803d"
+                      : "1px solid rgba(15, 23, 42, 0.14)",
+                  bgcolor: isDragTarget ? "#e0f2fe" : isSelected ? "#f0fdf4" : "background.paper",
+                  boxShadow: isDragTarget
+                    ? "0 0 0 4px rgba(15, 111, 178, 0.2), 0 14px 30px rgba(15, 23, 42, 0.22)"
+                    : isSelected
+                      ? "0 0 0 2px rgba(21, 128, 61, 0.16), 0 4px 12px rgba(15, 23, 42, 0.12)"
+                      : undefined,
+                  opacity: isAnotherDragTarget ? 0.58 : 1,
+                  transform: isDragTarget ? "translateY(-3px) scale(1.015)" : "none",
+                  zIndex: isDragTarget ? 2 : 1,
                   cursor: "pointer",
-                  transition: "border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+                  transition: "border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, opacity 140ms ease, transform 140ms ease",
                   "&:focus-visible": {
                     outline: "3px solid rgba(15, 111, 178, 0.35)",
                     outlineOffset: 2,
@@ -310,7 +312,52 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                 }}
               >
                 <ComplaintView hoveredIndex={hoveredIndex} notHovered={index != hoveredIndex} complaint={item} index={index} size={complaints.length} />
-                {isSelected && <Box
+                {dragDropMode ? <Box
+                  aria-hidden="true"
+                  sx={{
+                    position: "absolute",
+                    zIndex: 4,
+                    right: 0,
+                    bottom: 0,
+                    left: 0,
+                    minHeight: 36,
+                    px: 0.75,
+                    py: 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 0.5,
+                    bgcolor: isDragTarget
+                      ? "#0f6fb2"
+                      : isSelected
+                        ? "#15803d"
+                        : "rgba(15, 23, 42, 0.82)",
+                    color: "#fff",
+                    textAlign: "center",
+                    backdropFilter: "blur(3px)",
+                  }}
+                >
+                  {isSelected && <CheckIcon sx={{ fontSize: 16, flexShrink: 0 }} />}
+                  <Box>
+                    <Typography
+                      component="span"
+                      sx={{
+                        display: "-webkit-box",
+                        overflow: "hidden",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 2,
+                        fontSize: "clamp(0.62rem, 1.8vw, 0.78rem)",
+                        fontWeight: 800,
+                        lineHeight: 1.08,
+                      }}
+                    >
+                      {complaintLabels[item.type]}
+                    </Typography>
+                    {isDragTarget && <Typography component="span" sx={{ display: "block", mt: 0.25, fontSize: "0.6rem", fontWeight: 700, lineHeight: 1 }}>
+                      Drop photo
+                    </Typography>}
+                  </Box>
+                </Box> : isSelected && <Box
                   aria-hidden="true"
                   sx={{
                     position: "absolute",
@@ -322,12 +369,8 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 0.5,
                     bgcolor: "#15803d",
                     color: "#fff",
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    letterSpacing: 0,
                   }}
                 >
                   <CheckIcon sx={{ fontSize: 17 }} />
@@ -337,14 +380,20 @@ export const ComplaintsView = ({ onFiles, onPrepareUpload, step, selectedComplai
           })}
         </Box>
       </Box>
-      {showCaption && <Typography variant="body1" sx={{ fontWeight: 600, textAlign: "center", visibility: display }}>{tooltip}</Typography>}
-      {showCaption && <Typography sx={{ top: 0, fontSize: ".75rem", paddingLeft: ".2rem", paddingRight: ".2rem" }}>Left-to-Right and Top-to-Bottom: <u>Blocked bike lane</u>, <u>crosswalk</u>, <u>ran red light</u>, <u>drove recklessly</u>, <u>illegal parking</u>.</Typography>}
     </Box>
   );
 }
 
-export const LottiePlayer = ({ complaint, width, forcePlay }: ComplaintProps) => {
-  const goTo = forcePlay ? undefined : (complaint.lottieFrame || 0)
+export const LottiePlayer = ({ complaint, width }: ComplaintProps) => {
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden)
+
+  useEffect(() => {
+    const updateVisibility = () => setPageVisible(!document.hidden)
+    document.addEventListener("visibilitychange", updateVisibility)
+    updateVisibility()
+    return () => document.removeEventListener("visibilitychange", updateVisibility)
+  }, [])
+
   return (<Box
     key={complaint.type}
     sx={{
@@ -367,8 +416,7 @@ export const LottiePlayer = ({ complaint, width, forcePlay }: ComplaintProps) =>
         height: "100%",
         overflow: "hidden",
       }}
-      goTo={goTo}
-      play={!!forcePlay}
+      play={pageVisible}
       loop={true}      
       speed={complaint.lottieSpeed || 1}
       animationData={complaint.src}
