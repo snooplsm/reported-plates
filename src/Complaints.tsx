@@ -2,19 +2,20 @@ import { Box, Button, Paper, Typography } from "@mui/material"
 import { useEffect, useRef, useState } from "react";
 // import Lottie, { LottieRef, LottieRefCurrentProps } from 'lottie-react';
 import Lottie from 'react-lottie-player'
+import bikeLane from "./lottie/bikelane.json"
+import crosswalk from "./lottie/crosswalk.json"
 import ranRedLight from "./lottie/ranredlight.json"
 import reckless from "./lottie/reckless.json"
-import noParking from "./lottie/parkedillegally.json"
+import parkedIllegally from "./lottie/parkedillegally.json"
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckIcon from '@mui/icons-material/Check';
 import { Steps } from "./HowToGuide";
-import TextFit from "react-textfit"
 import { REPORT_FILE_ACCEPT } from "./api/file-utils";
 
 export interface Complaint {
   type: ComplaintType;
   media: MediaType;
-  src: string | any;
+  src: string | object;
   lottieFrame?: number,
   lottieSpeed?: number
 }
@@ -36,34 +37,31 @@ export enum MediaType {
 export const complaints: Complaint[] = [
   {
     type: ComplaintType.BlockedBikeLane,
-    media: MediaType.Image,
-    src: `images/complaint/bikelane.svg`
+    media: MediaType.Lottie,
+    src: bikeLane
   },
   {
     type: ComplaintType.BlockedCrosswalk,
-    media: MediaType.Image,
-    src: "images/complaint/crosswalk.svg"
+    media: MediaType.Lottie,
+    src: crosswalk
   },
   {
     type: ComplaintType.RanRedLight,
     media: MediaType.Lottie,
     src: ranRedLight,
-    lottieFrame: 20,
-    lottieSpeed: 2.3
+    lottieFrame: 20
   },
   {
     type: ComplaintType.DroveRecklessly,
     media: MediaType.Lottie,
     src: reckless,
-    lottieFrame: 50,
-    lottieSpeed: 3
+    lottieFrame: 48
   },
   {
     type: ComplaintType.ParkedIllegally,
     media: MediaType.Lottie,
     lottieFrame: 50,
-    lottieSpeed: 2,
-    src: noParking
+    src: parkedIllegally
   }
 ]
 
