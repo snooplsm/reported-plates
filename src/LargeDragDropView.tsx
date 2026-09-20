@@ -33,7 +33,7 @@ export const LargeDragDropView = ({onFiles, onPrepareUpload}:LargeDragProps) => 
             width: "80%",
             display: "flex",
         }}>
-        <ComplaintsView showCaption={true} hideUpload={true} onPrepareUpload={onPrepareUpload} onFiles={onFiles} onChange={()=>{}}/>
+        <ComplaintsView dragDropMode={true} showCaption={true} hideUpload={true} onPrepareUpload={onPrepareUpload} onFiles={onFiles} onChange={()=>{}}/>
         </Box>
     </Box>
 }
